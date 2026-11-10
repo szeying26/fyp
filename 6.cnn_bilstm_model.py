@@ -22,6 +22,12 @@ BATCH_SIZE = 32
 VALIDATION_SPLIT = 0.1
 RANDOM_SEED = 42
 
+# Daily log returns are ~0.01 in size, so the raw MSE loss is ~0.0001 and the
+# network settles on a near-constant prediction. Standardizing the target
+# (train statistics only) gives the loss a usable scale; predictions are
+# converted back to log returns before metrics are computed and saved.
+SCALE_TARGET = True
+
 
 # =========================
 # Reproducibility
@@ -148,6 +154,13 @@ def train_one_stock(stock_name):
     # Scale input features
     X_train, X_test = scale_train_test(X_train, X_test)
 
+    # Scale target (fit on training data only)
+    y_scaler = StandardScaler()
+    if SCALE_TARGET:
+        y_train_fit = y_scaler.fit_transform(y_train.reshape(-1, 1)).flatten()
+    else:
+        y_train_fit = y_train
+
     # Build model
     model = build_cnn_bilstm_model(input_shape=(X_train.shape[1], X_train.shape[2]))
 
@@ -161,7 +174,7 @@ def train_one_stock(stock_name):
     # Train
     history = model.fit(
         X_train,
-        y_train,
+        y_train_fit,
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,
         validation_split=VALIDATION_SPLIT,
@@ -171,6 +184,9 @@ def train_one_stock(stock_name):
 
     # Predict
     y_pred = model.predict(X_test, verbose=0).flatten()
+    if SCALE_TARGET:
+        # back to log-return units
+        y_pred = y_scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
 
     # Metrics
     mse = mean_squared_error(y_test, y_pred)
