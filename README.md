@@ -95,7 +95,7 @@ These produced the two new workbooks. They were written as working scripts durin
 | `MV model - tiny CNN-BiLSTM.xlsx` | **new** | Same design as the existing workbook, with tiny-model predictions and exact weights, plus a `Comparison` sheet. |
 | `MV model - daily tiny CNN-BiLSTM.xlsx` | **new** | Daily re-optimisation using each day's prediction. No trading costs. |
 
-### Generated data and outputs (not committed)
+### Generated data and outputs
 
 | Path | Contents |
 |---|---|
@@ -686,7 +686,7 @@ Yahoo Finance data can change slightly between downloads, and neural network tra
 - **Branch:** `alpha101-momentum-reversal-features`, pushed to `origin` (`szeying26/fyp`). It is not merged into `main`. Pull request link: <https://github.com/szeying26/fyp/pull/new/alpha101-momentum-reversal-features>
 - **Committed and pushed (commit `7cfab2b`):** `alpha101.py`, `4b.alpha_features.py`, `7.pooled_cnn_bilstm_model.py`, `8.plot_pooled_results.py`, and the changes to `1.raw_data.py`, `5.feature_engineering.py`, `6.cnn_bilstm_model.py`.
 - **Committed and pushed afterwards:** this `README.md`, the `optimization/` folder and the two new workbooks.
-- **Not committed (generated, can be reproduced with section 6):** `DATASET/`, `OUTPUT/`, `malaysia_stocks.csv`.
+- **Also committed:** the generated files `DATASET/`, `OUTPUT/` and `malaysia_stocks.csv`, so results can be inspected without re-running the pipeline.
 
 ---
 
