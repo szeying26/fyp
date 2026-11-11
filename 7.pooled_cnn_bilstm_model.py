@@ -58,7 +58,7 @@ def set_seed(seed=RANDOM_SEED):
 
 
 # =========================
-# Model: tiny CNN-BiLSTM (509 weights for 26 input features)
+# Model: tiny CNN-BiLSTM (477 weights for 22 input features)
 # =========================
 def build_cnn_bilstm_model(input_shape):
     model = Sequential()

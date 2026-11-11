@@ -22,14 +22,16 @@ All results use the same split: **train 2022–2024, test 2025**. Nothing from 2
 
 | Question | Answer |
 |---|---|
-| Was the original model underfitting because it lacked features? | No. Adding 13 Alpha101 features did not help the original network. The network itself was the bottleneck. |
+| Was the original model underfitting because it lacked features? | No. Adding the selected Alpha101 features did not help the original network. The network itself was the bottleneck. |
 | What is actually predictable in this data? | A small next-day reversal: after a down day a stock is slightly more likely to rise, and the reverse. Lag-1 autocorrelation of returns is about −0.09. |
-| What fixed the model? | Making it about 100 times smaller (509 weights instead of 54,321), looking at 5 days instead of 20, training one model on all 12 stocks, scaling the target, and averaging 5 runs. |
-| How good is the final model? | On 2025: correlation 0.145 between predicted and actual returns, error 1.3% lower than predicting "no change", direction right 53.7% of the time, better than "no change" for all 12 stocks. |
+| What fixed the model? | Making it about 100 times smaller (477 weights instead of about 54,000), looking at 5 days instead of 20, training one model on all 12 stocks, scaling the target, and averaging 5 runs. |
+| How good is the final model? | On 2025: correlation 0.137 between predicted and actual returns, error 1.4% lower than predicting "no change", direction right 52.7% of the time, better than "no change" for all 12 stocks. |
 | Is it the best possible model? | No. A one-variable straight-line model on yesterday's return is slightly better (correlation 0.170). |
 | Does the existing optimisation workbook show that predictions help? | It cannot. Its design averages a year of predictions into one number and holds one portfolio, so predictions barely enter. |
-| Do predictions help when used daily? | Yes, before trading costs. Daily re-optimisation returned 29–41% against about 14% for the static benchmark (Feb–Dec 2025), a statistically significant difference for λ up to 0.97 at K = 7, and for K = 4 to 8 at λ = 0.9. Across the full grid of 72 settings where the two portfolios can differ (K = 4 to 12, λ = 0.1 to 0.99), the daily portfolio is ahead in every one and significantly so in 47. The advantage shrinks as more stocks are held. |
-| And after trading costs? | At an assumed 0.15% per unit traded the advantage disappears. The break-even cost is 0.13–0.17%. The final workbook excludes costs at the user's request (research setting). |
+| Do predictions help when used daily? | Yes, before trading costs. Daily re-optimisation returned 28–41% against about 14% for the static benchmark (Feb–Dec 2025), a statistically significant difference for λ up to 0.97 at K = 7, and for every K from 4 to 12 at λ = 0.9. Across the full grid of 72 settings where the two portfolios can differ (K = 4 to 12, λ = 0.1 to 0.99), the daily portfolio is ahead in every one and significantly so in 51. |
+| And after trading costs? | At an assumed 0.15% per unit traded the advantage disappears. The break-even cost is 0.12–0.15%. The workbook excludes costs at the user's request (research setting). |
+| How does the daily strategy compare with the original workbook? | Over the same 224 days the original workbook's portfolios returned 12–16%; the daily tiny model returned 28–41% for λ up to 0.97. The gap in Sharpe ratio is statistically significant in only 3 of the 18 comparisons (section 4.15). |
+| What period does the data cover? | 3 January 2022 to 31 December 2025 only. Nothing from 2020–2021 is used anywhere, to keep the COVID period out. |
 
 ---
 
@@ -37,15 +39,15 @@ All results use the same split: **train 2022–2024, test 2025**. Nothing from 2
 
 1. **Researched Alpha101.** Read the Coriva overview (<https://coriva.eu.org/alpha101-overview/>) and its momentum/reversal detail page for the 23 factors in that category.
 2. **Added the features.** Implemented 21 of the 23 momentum/reversal alphas (`alpha101.py`). Two were skipped: #56 needs market cap, #90 needs an industry classification.
-3. **Ran a correlation check** (`4b.alpha_features.py`) on the training years only. 13 alphas were kept.
+3. **Ran a correlation check** (`4b.alpha_features.py`) on the training years only. 9 alphas were kept.
 4. **Tested the original CNN-BiLSTM with and without the alphas.** No improvement; both were worse than predicting zero.
 5. **Scaled the target and trained a pooled model.** Error fell closer to the "predict zero" level, but mostly because the network predicted less, not better.
 6. **Analysed rolling z-score normalisation.** Safe and mildly helpful on the inputs; harmful on the target.
 7. **Added the rolling z-score to the pipeline** (`5.feature_engineering.py`).
-8. **Tried smaller networks.** A 509-weight CNN-BiLSTM on a 5-day window was the first network to beat predicting zero.
+8. **Tried smaller networks.** A tiny CNN-BiLSTM (about 500 weights) on a 5-day window was the first network to beat predicting zero.
 9. **Published an explainer report** on the tiny CNN-BiLSTM for a non-technical reader: <https://claude.ai/artifact/NwTXM5m9R5sDUyxncg57yh> (private to the account owner until shared; it describes single-run numbers, see section 4.8).
 10. **Made the tiny model the pipeline default** (`7.pooled_cnn_bilstm_model.py`), averaged over 5 runs, and **plotted its results** (`8.plot_pooled_results.py`), including the two figure types from `plotting.py`.
-11. **Diagnosed the "flat" predictions.** Not classic underfitting and not caused by log returns; the model is about 2.6 times too timid.
+11. **Diagnosed the "flat" predictions.** Not classic underfitting and not caused by log returns; the model is more than twice too timid.
 12. **Committed and pushed** the code to branch `alpha101-momentum-reversal-features`.
 13. **Analysed the existing optimisation workbook** (`Copy ver MV model.xlsx`).
 14. **Rebuilt the optimisation with tiny-model predictions** (`MV model - tiny CNN-BiLSTM.xlsx`) and compared it with the existing results.
@@ -53,6 +55,8 @@ All results use the same split: **train 2022–2024, test 2025**. Nothing from 2
 16. **Built a daily-rebalanced version** (`MV model - daily tiny CNN-BiLSTM.xlsx`), first with trading costs, then with costs removed.
 17. **Added the cardinality loop to the daily version.** The first build fixed K = 7. The existing workbook's stock-selection stage loops K from 4 to 12, so the daily version now does the same.
 18. **Computed the full grid.** Every K from 4 to 12 combined with every λ (81 settings), added to the daily workbook as a `Grid summary` sheet and nine `Grid K` sheets.
+19. **Set all data to start in 2022.** The price download begins on 3 January 2022, to keep the COVID period (2020–2021) out of every calculation, including look-back history. Every step, every experiment in section 4 and both workbooks were run on this data; all numbers in this README come from it. Alphas that need 200–250 days of history are excluded by the coverage rule, and the first 60 trading days of 2022 serve only as look-back history.
+20. **Compared the daily strategy with the original workbook.** The original workbook's own portfolios were backtested over the same days and compared with the daily tiny model (sheet `vs Original`, section 4.15).
 
 ---
 
@@ -62,15 +66,15 @@ All results use the same split: **train 2022–2024, test 2025**. Nothing from 2
 
 | File | Status | What it does |
 |---|---|---|
-| `1.raw_data.py` | changed | Downloads the 12 stocks from Yahoo Finance. Still writes the adjusted-close file `malaysia_stocks.csv` for 2022 onwards. **New:** also writes `DATASET/ohlcv_malaysia_stocks.csv`, a full open/high/low/close/volume table from Oct 2020, because some alphas need up to 250 days of history. Stops with an error if Yahoo returns an empty column for any stock. |
+| `1.raw_data.py` | changed | Downloads the 12 stocks from Yahoo Finance. Still writes the adjusted-close file `malaysia_stocks.csv` for 2022 onwards. **New:** also writes `DATASET/ohlcv_malaysia_stocks.csv`, a full open/high/low/close/volume table for the same period (3 Jan 2022 onwards; nothing earlier is downloaded). Stops with an error if Yahoo returns an empty column for any stock. |
 | `2.data_preprocess.py` | unchanged | Cleans the adjusted-close file (dates, duplicates, missing rows). |
 | `3.return_calculation.py` | unchanged | Turns prices into daily log returns, `DATASET/log_returns.csv`. |
 | `4.train_test_split.py` | unchanged | Splits returns into train (2022–2024) and test (2025). |
 | `alpha101.py` | **new** | Library of operators (`rank`, `ts_rank`, `delta`, `decay_linear`, …) and the 21 momentum/reversal alphas. Every alpha on day t uses data up to the close of day t only. |
 | `4b.alpha_features.py` | **new** | Computes the alphas, runs the correlation check on the training years, and saves the features, the report and the selected list. Run after step 4 and before step 5. |
-| `5.feature_engineering.py` | changed | Builds the 20-day input windows. **New options:** `USE_ALPHA_FEATURES` (append the target stock's 13 selected alphas) and `USE_ROLLING_ZSCORE` (replace input returns with a 60-day rolling z-score). The prediction target is always the plain log return. With both on, each window has 25 features instead of 12. |
+| `5.feature_engineering.py` | changed | Builds the 20-day input windows. **New options:** `USE_ALPHA_FEATURES` (append the target stock's 9 selected alphas) and `USE_ROLLING_ZSCORE` (replace input returns with a 60-day rolling z-score). The prediction target is always the plain log return. With both on, each window has 21 features instead of 12. Days at the start of 2022 that lack look-back history are left out of the training sample. |
 | `6.cnn_bilstm_model.py` | changed | The original per-stock CNN-BiLSTM (54,321 weights). **New option:** `SCALE_TARGET` standardises the target using training data and converts predictions back to log returns. Kept for comparison; not the recommended model. |
-| `7.pooled_cnn_bilstm_model.py` | **new** | The final model. One tiny CNN-BiLSTM (509 weights) trained on all 12 stocks together, using the last 5 days of each window, trained 5 times with different seeds and averaged. Writes to `DATASET/model_output_pooled/`. |
+| `7.pooled_cnn_bilstm_model.py` | **new** | The final model. One tiny CNN-BiLSTM (477 weights) trained on all 12 stocks together, using the last 5 days of each window, trained 5 times with different seeds and averaged. Writes to `DATASET/model_output_pooled/`. |
 | `8.plot_pooled_results.py` | **new** | All result plots for the final model, written to `OUTPUT/pooled_model_plots/`. |
 | `plotting.py` | unchanged | The original plotting script. It reads the step 6 output folder. Its two figure types are reproduced for the final model by step 8. |
 
@@ -100,12 +104,12 @@ These produced the two new workbooks. They were written as working scripts durin
 | Path | Contents |
 |---|---|
 | `malaysia_stocks.csv` | Adjusted close prices from step 1. |
-| `DATASET/ohlcv_malaysia_stocks.csv` | OHLCV table from Oct 2020 (step 1). |
+| `DATASET/ohlcv_malaysia_stocks.csv` | OHLCV table from 3 Jan 2022 (step 1). |
 | `DATASET/cleaned_malaysia_stocks.csv`, `log_returns.csv`, `train_log_returns.csv`, `test_log_returns.csv` | Outputs of steps 2–4. |
 | `DATASET/alpha_features/alpha_features.csv` | All 21 alphas for every stock and day, cleaned. |
 | `DATASET/alpha_features/alpha_ic_report.csv` | The correlation check table (section 4.2). |
 | `DATASET/alpha_features/alpha_feature_correlation.csv` | Correlation between features on the training years. |
-| `DATASET/alpha_features/selected_alpha_features.json` | The 13 selected alphas, read by step 5. |
+| `DATASET/alpha_features/selected_alpha_features.json` | The 9 selected alphas, read by step 5. |
 | `DATASET/windowed_data/` | Model inputs and targets per stock (step 5). |
 | `DATASET/model_output_pooled/` | Final model: 5 saved networks, per-stock predictions, `predicted_returns_all_stocks.csv`, metrics. |
 | `OUTPUT/pooled_model_plots/` | All figures (section 4.9). |
@@ -138,127 +142,128 @@ Run on 2022–2024 only (733 days × 12 stocks). Each alpha on day t was compare
 - **IC** (information coefficient): Spearman correlation between the alpha and the next-day return, after standardising each stock's series.
 - **Partial IC**: the same after removing what the stock's own day-t return already explains. The model already receives that return, so an alpha only adds value if it predicts something beyond it.
 - **Selection rule:** coverage ≥ 95%, |partial IC| ≥ 0.02 (about two standard errors), and correlation below 0.70 with the day-t return and with any alpha already kept.
-- Before the check each alpha is winsorised at its training 1%/99% quantiles per stock; remaining gaps are forward-filled, then filled with the training median.
+- **Coverage** is the share of training days on which the alpha has a value. Because the data starts in 2022, an alpha with a long look-back has no value for its first days. The five alphas that need 200–250 days of history (#19, #24, #37, #39, #52) cover only 66–73% of the training days and are dropped by this rule. The others need at most 34 days.
+- Before the check each alpha is winsorised at its training 1%/99% quantiles per stock; gaps after an alpha's first value are forward-filled, then filled with the training median. The days before its first value are left empty.
 
-| Feature | Train IC | Train partial IC | Stocks with same sign | Test IC | Test partial IC | Decision |
-|---|---|---|---|---|---|---|
-| ret_1d (own day-t return) | -0.087 | n/a | 12/12 | -0.122 | n/a | base feature, already in the model |
-| alpha038 | 0.110 | 0.071 | 12/12 | 0.126 | 0.061 | KEPT |
-| alpha033 | 0.102 | 0.059 | 12/12 | 0.124 | 0.055 | dropped: correlation +0.85 with alpha038 |
-| alpha039 | 0.068 | 0.052 | 12/12 | 0.062 | 0.039 | KEPT |
-| alpha008 | 0.066 | 0.049 | 11/12 | 0.070 | 0.048 | KEPT |
-| alpha019 | 0.066 | 0.048 | 12/12 | 0.039 | 0.011 | KEPT |
-| alpha084 | 0.069 | 0.047 | 12/12 | 0.082 | 0.051 | KEPT |
-| alpha035 | 0.091 | 0.043 | 12/12 | 0.107 | 0.030 | KEPT |
-| alpha053 | 0.070 | 0.038 | 12/12 | 0.068 | 0.027 | KEPT |
-| alpha046 | 0.063 | 0.037 | 12/12 | 0.070 | 0.030 | KEPT |
-| alpha037 | 0.073 | 0.037 | 11/12 | 0.104 | 0.043 | KEPT |
-| alpha052 | 0.040 | 0.034 | 10/12 | 0.024 | 0.013 | KEPT |
-| alpha010 | 0.078 | 0.028 | 12/12 | 0.110 | 0.041 | KEPT |
-| alpha030 | 0.054 | 0.025 | 11/12 | 0.057 | 0.016 | KEPT |
-| alpha029 | 0.020 | 0.021 | 7/12 | 0.032 | 0.029 | KEPT |
-| alpha024 | 0.036 | 0.018 | 10/12 | 0.054 | 0.035 | dropped: partial IC below 0.02 |
-| alpha009 | 0.076 | -0.016 | 12/12 | 0.116 | 0.005 | dropped: partial IC below 0.02 |
-| alpha023 | 0.010 | -0.014 | 7/12 | 0.032 | 0.001 | dropped: partial IC below 0.02 |
-| alpha020 | 0.018 | 0.013 | 9/12 | 0.006 | 0.001 | dropped: partial IC below 0.02 |
-| alpha049 | 0.082 | -0.013 | 12/12 | 0.126 | 0.031 | dropped: partial IC below 0.02 |
-| alpha051 | 0.079 | 0.010 | 12/12 | 0.131 | 0.052 | dropped: partial IC below 0.02 |
-| alpha004 | 0.003 | 0.000 | 8/12 | 0.000 | -0.005 | dropped: partial IC below 0.02 |
+| Feature | Coverage | Train IC | Train partial IC | Stocks with same sign | Test IC | Test partial IC | Decision |
+|---|---|---|---|---|---|---|---|
+| ret_1d (own day-t return) | 100% | −0.087 | n/a | 12/12 | −0.122 | n/a | base feature, already in the model |
+| alpha038 | 99% | 0.112 | 0.074 | 12/12 | 0.126 | 0.061 | KEPT |
+| alpha033 | 100% | 0.102 | 0.059 | 12/12 | 0.124 | 0.055 | dropped: correlation +0.85 with alpha038 |
+| alpha039 | 66% | 0.073 | 0.055 | 12/12 | 0.062 | 0.040 | dropped: coverage 66% below 95% (needs more history than 2022 provides) |
+| alpha008 | 98% | 0.068 | 0.051 | 11/12 | 0.070 | 0.048 | KEPT |
+| alpha084 | 95% | 0.073 | 0.050 | 12/12 | 0.082 | 0.051 | KEPT |
+| alpha019 | 66% | 0.066 | 0.045 | 12/12 | 0.038 | 0.010 | dropped: coverage 66% below 95% (needs more history than 2022 provides) |
+| alpha035 | 96% | 0.095 | 0.044 | 12/12 | 0.106 | 0.030 | KEPT |
+| alpha053 | 99% | 0.070 | 0.039 | 12/12 | 0.068 | 0.027 | KEPT |
+| alpha046 | 97% | 0.065 | 0.038 | 12/12 | 0.067 | 0.026 | KEPT |
+| alpha052 | 67% | 0.043 | 0.036 | 9/12 | 0.024 | 0.012 | dropped: coverage 67% below 95% (needs more history than 2022 provides) |
+| alpha037 | 73% | 0.080 | 0.033 | 12/12 | 0.104 | 0.044 | dropped: coverage 73% below 95% (needs more history than 2022 provides) |
+| alpha024 | 73% | 0.050 | 0.029 | 11/12 | 0.052 | 0.033 | dropped: coverage 73% below 95% (needs more history than 2022 provides) |
+| alpha010 | 100% | 0.078 | 0.029 | 12/12 | 0.110 | 0.041 | KEPT |
+| alpha030 | 98% | 0.058 | 0.028 | 11/12 | 0.057 | 0.016 | KEPT |
+| alpha029 | 99% | 0.020 | 0.021 | 7/12 | 0.032 | 0.029 | KEPT |
+| alpha049 | 97% | 0.083 | −0.018 | 11/12 | 0.126 | 0.031 | dropped: partial IC below 0.02 |
+| alpha009 | 99% | 0.076 | −0.015 | 12/12 | 0.115 | 0.005 | dropped: partial IC below 0.02 |
+| alpha020 | 100% | 0.018 | 0.013 | 8/12 | 0.009 | 0.003 | dropped: partial IC below 0.02 |
+| alpha023 | 98% | 0.014 | −0.011 | 9/12 | 0.031 | 0.000 | dropped: partial IC below 0.02 |
+| alpha051 | 97% | 0.081 | 0.010 | 11/12 | 0.131 | 0.052 | dropped: partial IC below 0.02 |
+| alpha004 | 99% | 0.004 | 0.001 | 8/12 | 0.000 | −0.005 | dropped: partial IC below 0.02 |
 
 The test columns are an out-of-sample check and were not used for selection.
 
-**Selected (13):** alpha038, 039, 008, 019, 084, 035, 053, 046, 037, 052, 010, 030, 029. The highest correlation between any two of them is 0.60.
+**Selected (9):** alpha038, 008, 084, 035, 053, 046, 010, 030, 029. The highest correlation between any two of them is 0.61.
 
 **What the check revealed:** every alpha has a positive IC because they all partly measure the same thing, the next-day reversal. The per-stock lag-1 autocorrelation of returns in training ranges from +0.02 (CIMB) to −0.19 (Maxis).
 
 ### 4.3 Original CNN-BiLSTM, with and without the alphas
 
-Per-stock models (Conv1D 64 filters → max pooling → BiLSTM 50 → dropout → dense 32 → 1), 12 stocks × 3 seeds.
+Per-stock models (Conv1D 64 filters → max pooling → BiLSTM 50 → dropout → dense 32 → 1), raw returns as inputs, 12 stocks × 3 seeds.
 
 | Inputs | MSE ÷ MSE of predicting zero | Correlation with actual | Stocks improved by alphas |
 |---|---|---|---|
-| Returns only | 1.054 | 0.027 | n/a |
-| Returns + 13 alphas | 1.075 | −0.012 | 4 of 12 |
+| Returns only | 1.054 | 0.026 | n/a |
+| Returns + 9 alphas | 1.293 (median run 1.010) | 0.024 | 5 of 12 |
 
-Both are worse than predicting zero. A ridge regression on yesterday's return alone reached a correlation of about 0.12 and beat zero, and adding the 13 alphas to that regression changed nothing (0.115). Conclusion: the features carry signal individually but add almost nothing jointly, and the network was failing to learn even the simple reversal.
+Both are worse than predicting zero. The average with alphas is pulled up by Maybank, where the network's error was 3.7 times the zero baseline; the median run is 1.010. A ridge regression on yesterday's return alone reached a correlation of 0.17 and beat zero, and giving that regression all the features did not improve it (0.16). Conclusion: the features carry signal individually but add almost nothing jointly, and the network was failing to learn even the simple reversal.
 
 ### 4.4 Target scaling and pooling
 
-Daily returns are about 0.01 in size, so the raw squared-error loss is tiny and the network settles near a constant. Scaling the target fixes the loss scale. Pooling trains one model on all stocks (about 8,500 samples instead of about 713 per stock).
+Daily returns are about 0.01 in size, so the raw squared-error loss is tiny and the network settles near a constant. Scaling the target fixes the loss scale. Pooling trains one model on all stocks (about 8,000 samples instead of about 700 per stock).
 
 | Model (3 seeds, 12 stocks) | MSE ÷ zero | Correlation | Stocks beating zero |
 |---|---|---|---|
-| Per-stock, raw target, returns only (original) | 1.054 | 0.027 | 3 of 12 |
-| Per-stock, raw target, + alphas | 1.075 | −0.012 | 1 of 12 |
-| Per-stock, scaled target, returns only | 1.022 | 0.020 | 1 of 12 |
-| Per-stock, scaled target, + alphas | 1.014 | 0.014 | 1 of 12 |
-| Pooled, scaled target, returns only | 1.007 | 0.000 | 0 of 12 |
-| Pooled, scaled target, + alphas | 1.002 | 0.027 | 4 of 12 |
+| Per-stock, raw target, returns only (original) | 1.054 | 0.026 | 2 of 12 |
+| Per-stock, raw target, + alphas | 1.293 | 0.024 | 0 of 12 |
+| Per-stock, scaled target, returns only | 1.019 | 0.020 | 1 of 12 |
+| Per-stock, scaled target, + alphas | 1.009 | 0.013 | 1 of 12 |
+| Pooled, scaled target, returns only | 1.003 | 0.019 | 4 of 12 |
+| Pooled, scaled target, + alphas | 1.002 | 0.019 | 4 of 12 |
 
-Error moved towards the "predict zero" level, but the predictions shrank (to 6–10% of the size of actual moves, from 16%) while correlation did not improve.
+Error moved towards the "predict zero" level, but the predictions shrank (to 5–10% of the size of actual moves, from 16%) while correlation did not improve.
 
 ### 4.5 Rolling z-score analysis
 
-The z-score for day t uses the mean and standard deviation of the **previous** W days only, so nothing leaks from the future.
+The z-score for day t uses the mean and standard deviation of the **previous** W days only, so nothing leaks from the future. With data from 2022 only, the first W days of returns have no z-score and drop out of training, so a longer window costs more training days (20, 60 or 120).
 
-Effect on the data (training years, average of 12 stocks):
+Effect on the data (average of 12 stocks):
 
 | Property | Raw | z, 20-day | z, 60-day | z, 120-day |
 |---|---|---|---|---|
-| Test volatility ÷ train volatility | 1.20 | 1.03 | 1.04 | 1.00 |
-| Range of that ratio across stocks | 0.88–2.03 | 0.96–1.16 | 0.95–1.14 | 0.86–1.15 |
+| Test volatility ÷ train volatility | 1.20 | 1.03 | 1.05 | 1.00 |
+| Range of that ratio across stocks | 0.88–2.03 | 0.96–1.17 | 0.95–1.15 | 0.88–1.12 |
 | Volatility clustering (lag-1 autocorrelation of absolute returns) | 0.18 | 0.10 | 0.14 | 0.16 |
-| Excess kurtosis | 4.4 | 5.0 | 5.2 | 5.9 |
+| Excess kurtosis | 4.4 | 5.0 | 5.5 | 6.9 |
 | Correlation with next-day return, test | −0.115 | −0.111 | −0.118 | −0.120 |
 
 Effect on the model (original architecture; pooled rows 5 seeds, per-stock rows 3 seeds):
 
 | Model | MSE ÷ zero | Correlation | Stocks beating zero |
 |---|---|---|---|
-| Pooled, raw inputs | 1.009 | 0.007 | 1 of 12 |
-| Pooled, z inputs 20-day | 1.011 | 0.009 | 1 of 12 |
-| Pooled, z inputs 60-day | 1.006 | 0.018 | 1 of 12 |
-| Pooled, z inputs 120-day | 1.005 | 0.024 | 2 of 12 |
-| Pooled, z inputs and z target, 60-day | 1.018 | −0.030 | 0 of 12 |
-| Pooled, raw inputs + alphas | 1.006 | 0.028 | 1 of 12 |
-| Pooled, z inputs 60-day + alphas | 1.003 | 0.056 | 6 of 12 |
-| Per-stock, raw inputs | 1.022 | 0.020 | 1 of 12 |
-| Per-stock, z inputs 60-day | 1.020 | 0.016 | 3 of 12 |
-| Per-stock, z inputs and z target, 60-day | 1.030 | −0.020 | 0 of 12 |
+| Pooled, raw inputs | 1.007 | 0.014 | 1 of 12 |
+| Pooled, z inputs 20-day | 1.018 | 0.001 | 1 of 12 |
+| Pooled, z inputs 60-day | 1.004 | 0.034 | 4 of 12 |
+| Pooled, z inputs 120-day | 1.031 | 0.024 | 0 of 12 |
+| Pooled, z inputs and z target, 60-day | 1.014 | −0.005 | 0 of 12 |
+| Pooled, raw inputs + alphas | 1.002 | 0.027 | 4 of 12 |
+| Pooled, z inputs 60-day + alphas | 1.002 | 0.050 | 6 of 12 |
+| Per-stock, raw inputs | 1.019 | 0.020 | 1 of 12 |
+| Per-stock, z inputs 60-day | 1.024 | 0.015 | 2 of 12 |
+| Per-stock, z inputs and z target, 60-day | 1.032 | −0.023 | 0 of 12 |
 | Ridge on yesterday's return, raw | 0.976 | 0.17 | 10 of 12 |
-| Ridge, z input and z target | 0.987 | 0.11 | 10 of 12 |
+| Ridge, z input and z target | 0.986 | 0.12 | 10 of 12 |
 
 Decision: use a 60-day rolling z-score on the **inputs** and leave the target as a plain log return.
 
 ### 4.6 Smaller networks
 
-Pooled setup, z-scored inputs plus 13 alphas (26 input features), 5 seeds each.
+Pooled setup, z-scored inputs plus 9 alphas (22 input features), 5 seeds each.
 
 | Model | Weights | Window | MSE ÷ zero | Correlation | Stocks beating zero |
 |---|---|---|---|---|---|
-| Original CNN-BiLSTM (64 filters, LSTM 50, dense 32) | 54,321 | 20 days | 1.003 | 0.056 | 6 of 12 |
-| Small CNN-BiLSTM (8 filters, LSTM 8, pooling, dropout) | 1,737 | 20 days | 1.006 | 0.021 | 1 of 12 |
-| Small CNN-BiLSTM (same) | 1,737 | 10 days | 1.009 | 0.008 | 0 of 12 |
-| Small LSTM (8 units) | 1,129 | 20 days | 0.998 | 0.079 | 6 of 12 |
-| Small LSTM (8 units) | 1,129 | 5 days | 0.997 | 0.081 | 7 of 12 |
-| Small dense (8 units) | 1,057 | 5 days | 1.058 | 0.057 | 0 of 12 |
-| **Tiny CNN-BiLSTM (4 filters of width 2, LSTM 4 each way)** | **509** | **5 days** | **0.992** | **0.098** | **9 of 12** |
-| Linear layer | 131 | 5 days | 1.013 | 0.093 | 3 of 12 |
-| Linear layer | 27 | 1 day | 0.982 | 0.136 | 9 of 12 |
+| Original CNN-BiLSTM (64 filters, LSTM 50, dense 32) | 53,553 | 20 days | 1.002 | 0.050 | 6 of 12 |
+| Small CNN-BiLSTM (8 filters, LSTM 8, pooling, dropout) | 1,641 | 20 days | 1.005 | 0.034 | 2 of 12 |
+| Small CNN-BiLSTM (same) | 1,641 | 10 days | 1.007 | 0.011 | 3 of 12 |
+| Small LSTM (8 units) | 1,001 | 20 days | 0.996 | 0.089 | 6 of 12 |
+| Small LSTM (8 units) | 1,001 | 5 days | 0.994 | 0.095 | 6 of 12 |
+| Small dense (8 units) | 897 | 5 days | 1.050 | 0.071 | 1 of 12 |
+| **Tiny CNN-BiLSTM (4 filters of width 2, LSTM 4 each way)** | **477** | **5 days** | **0.992** | **0.085** | **10 of 12** |
+| Linear layer | 111 | 5 days | 1.005 | 0.101 | 4 of 12 |
+| Linear layer | 23 | 1 day | 0.979 | 0.141 | 9 of 12 |
 | Ridge on yesterday's z-scored return | 1 | 1 day | 0.976 | 0.170 | 10 of 12 |
 
-- The tiny CNN-BiLSTM is the best neural network and the first to beat predicting zero.
-- Size is not the whole story: the 1,737-weight version, which kept pooling and dropout, did worse than the original. Which of those differences matters was not isolated.
-- More history hurts even a linear model (0.136 with 1 day, 0.093 with 5 days): the usable signal is in the most recent day.
+- The tiny CNN-BiLSTM beats predicting zero for the most stocks of any neural network with a hidden layer (10 of 12). The small LSTMs also get below 1.0 on average, with slightly higher correlation, but for only 6 stocks.
+- Size is not the whole story: the 1,641-weight version, which kept pooling and dropout, did no better than the original. Which of those differences matters was not isolated.
+- More history hurts even a linear model (0.141 with 1 day, 0.101 with 5 days): the usable signal is in the most recent day.
 
 ### 4.7 The final model
 
 `7.pooled_cnn_bilstm_model.py`:
 
-- **Inputs:** last 5 trading days × 26 numbers: the target stock's own z-scored return, all 12 stocks' z-scored returns, and the target stock's 13 alphas. Inputs are standardised per stock on training data.
-- **Network:** Conv1D (4 filters, kernel 2) → BiLSTM (4 units each way) → Dense(1). Weights: 212 + 288 + 9 = 509.
+- **Inputs:** last 5 trading days × 22 numbers: the target stock's own z-scored return, all 12 stocks' z-scored returns, and the target stock's 9 alphas. Inputs are standardised per stock on training data.
+- **Network:** Conv1D (4 filters, kernel 2) → BiLSTM (4 units each way) → Dense(1). Weights: 180 + 288 + 9 = 477.
 - **Target:** next-day log return, standardised per stock on training data; predictions are converted back.
-- **Training:** all 12 stocks pooled; 7,704 fitting samples; the most recent 10% of each stock's training windows (852 samples) used for early stopping; batch 64, up to 30 epochs, patience 5.
+- **Training:** all 12 stocks pooled; 653 windows per stock (1 April 2022 is the earliest input day, after 60 days of look-back); 7,056 fitting samples; the most recent 10% of each stock's training windows (780 samples) used for early stopping; batch 64, up to 30 epochs, patience 5.
 - **Averaging:** 5 runs with seeds 42–46; predictions averaged.
 - **Test:** 224 days × 12 stocks = 2,688 predictions (3 Feb to 31 Dec 2025).
 
@@ -266,35 +271,35 @@ Results on 2025:
 
 | | Single run (average of 5) | 5 runs averaged (final) |
 |---|---|---|
-| Correlation with actual returns | 0.098 | 0.145 |
-| MSE ÷ zero | 0.992 | 0.987 |
-| Direction hit rate | 52.7% | 53.7% |
-| Stocks beating zero | 9 of 12 | 12 of 12 |
+| Correlation with actual returns | 0.085 | 0.137 |
+| MSE ÷ zero | 0.992 | 0.986 |
+| Direction hit rate | 52.1% | 52.7% |
+| Stocks beating zero | 10 of 12 | 12 of 12 |
 
 Final model by stock:
 
 | Stock | Correlation | MSE ÷ zero | Direction hit rate |
 |---|---|---|---|
-| CIMB (1023.KL) | 0.172 | 0.989 | 53.2% |
-| Maybank (1155.KL) | 0.193 | 0.985 | 49.5% |
-| Public Bank (1295.KL) | 0.230 | 0.977 | 59.5% |
-| TM (4863.KL) | 0.204 | 0.974 | 57.5% |
-| PChem (5183.KL) | 0.017 | 0.999 | 46.7% |
-| Sunway (5211.KL) | 0.179 | 0.976 | 56.1% |
-| IHH Healthcare (5225.KL) | 0.002 | 0.998 | 56.2% |
-| Tenaga (5347.KL) | 0.200 | 0.982 | 56.8% |
-| Hong Leong Bank (5819.KL) | 0.167 | 0.986 | 53.0% |
-| Maxis (6012.KL) | 0.106 | 0.992 | 53.3% |
-| Axiata (6888.KL) | 0.133 | 0.991 | 52.2% |
-| Press Metal (8869.KL) | 0.136 | 0.996 | 51.0% |
+| CIMB (1023.KL) | 0.067 | 0.997 | 53.2% |
+| Maybank (1155.KL) | 0.260 | 0.977 | 50.0% |
+| Public Bank (1295.KL) | 0.144 | 0.984 | 47.7% |
+| TM (4863.KL) | 0.136 | 0.980 | 54.4% |
+| PChem (5183.KL) | 0.029 | 0.998 | 48.6% |
+| Sunway (5211.KL) | 0.129 | 0.983 | 55.6% |
+| IHH Healthcare (5225.KL) | 0.026 | 0.995 | 54.6% |
+| Tenaga (5347.KL) | 0.168 | 0.988 | 55.3% |
+| Hong Leong Bank (5819.KL) | 0.204 | 0.982 | 54.5% |
+| Maxis (6012.KL) | 0.162 | 0.980 | 52.8% |
+| Axiata (6888.KL) | 0.121 | 0.990 | 58.2% |
+| Press Metal (8869.KL) | 0.195 | 0.980 | 48.0% |
 
-Sorting all 2,688 test predictions into five equal groups by predicted value, the average actual next-day return rises steadily: −0.16%, 0.00%, +0.05%, +0.10%, +0.32%.
+Sorting all 2,688 test predictions into five equal groups by predicted value, the average actual next-day return rises steadily: −0.16%, −0.01%, +0.04%, +0.16%, +0.28%.
 
 ### 4.8 The explainer report
 
 <https://claude.ai/artifact/NwTXM5m9R5sDUyxncg57yh>
 
-A plain-language page on the tiny CNN-BiLSTM: what it predicts, what goes in, how the two layers work, how it was trained, how to read the scores, results, limits and a glossary. It was written before the 5-run averaging was added, so its numbers are the single-run figures (correlation 0.098, error 99.2%, hit rate 52.7%, 9 of 12 stocks), not the final averaged ones in section 4.7. The page was not previewed before publishing.
+A plain-language page on the tiny CNN-BiLSTM: what it predicts, what goes in, how the two layers work, how it was trained, how to read the scores, results, limits and a glossary. **It has not been updated since the model was finalised,** so its description and figures do not match the current model. The current numbers are in section 4.7. The page was not previewed before publishing.
 
 ### 4.9 Plots
 
@@ -314,18 +319,18 @@ Written by `8.plot_pooled_results.py` to `OUTPUT/pooled_model_plots/`:
 
 | Check | Train | Test |
 |---|---|---|
-| Correlation with actual returns | 0.184 | 0.145 |
-| MSE ÷ zero | 0.977 | 0.987 |
-| Size of predictions relative to actual moves | 6.5% | 5.6% |
-| Size they should be, given that correlation | 18.4% | 14.5% |
-| Average predicted return per day | 0.035% | 0.033% |
-| Average actual return per day | 0.036% | 0.061% |
+| Correlation with actual returns | 0.187 | 0.137 |
+| MSE ÷ zero | 0.976 | 0.986 |
+| Size of predictions relative to actual moves | 6.8% | 6.0% |
+| Size they should be, given that correlation | 18.7% | 13.7% |
+| Average predicted return per day | 0.051% | 0.049% |
+| Average actual return per day | 0.034% | 0.061% |
 
-- A model that minimises squared error should move only as much as it is sure of. With a correlation of 0.145 the ideal predictions are about 14.5% the size of real moves, so even a perfect version would look nearly flat on a shared axis.
+- A model that minimises squared error should move only as much as it is sure of. With a correlation of 0.137 the ideal predictions are about 13.7% the size of real moves, so even a perfect version would look nearly flat on a shared axis.
 - Train and test results are close, so the model is neither memorising nor failing to learn.
-- It is **under-confident** by a factor of about 2.6 (calibration slope 2.59 on test, 2.85 on train). Early stopping and averaging both pull predictions towards zero.
+- It is **under-confident** by a factor of about 2.3 (calibration slope 2.34 on test, 2.77 on train). Early stopping and averaging both pull predictions towards zero.
 - Log returns are not the cause: log and simple returns differ by at most 0.32 percentage points on the most extreme day, and the average prediction is close to the average actual return.
-- A possible improvement, **not implemented**: multiply predictions by about 2.85 (learned from training data). Correlation would be unchanged and error should fall to roughly 98% of the zero baseline.
+- A possible improvement, **not implemented**: multiply predictions by about 2.8 (learned from training data). Correlation would be unchanged and error should fall to roughly 98% of the zero baseline.
 
 ### 4.11 The existing optimisation workbook
 
@@ -387,21 +392,24 @@ Risk-return trade-off, K=7 (cumulative return 2025 / annual Sharpe):
 
 | λ | Existing benchmark | Existing CNN-BiLSTM | Rebuilt benchmark | Rebuilt tiny model |
 |---|---|---|---|---|
-| 0.1–0.7 | 6.61% / 0.31 | 9.22% / 0.49 | 6.61% / 0.31 | 8.19% / 0.40 |
-| 0.9 | 8.79% / 0.49 | 9.22% / 0.49 | 8.80% / 0.49 | 8.39% / 0.45 |
-| 0.95 | 9.99% / 0.66 | 8.53% / 0.48 | 9.94% / 0.64 | 9.07% / 0.54 |
-| 0.97 | 10.82% / 0.76 | 9.03% / 0.55 | 10.88% / 0.74 | 10.37% / 0.69 |
-| 0.99 | 9.32% / 0.63 | 12.52% / 0.90 | 11.59% / 0.84 | 11.53% / 0.84 |
+| 0.1 | 6.61% / 0.31 | 9.22% / 0.49 | 6.61% / 0.31 | 7.26% / 0.36 |
+| 0.3 | 6.61% / 0.31 | 9.22% / 0.49 | 6.61% / 0.31 | 7.26% / 0.36 |
+| 0.5 | 6.61% / 0.31 | 9.22% / 0.49 | 6.61% / 0.31 | 7.53% / 0.37 |
+| 0.7 | 6.61% / 0.31 | 9.22% / 0.49 | 6.61% / 0.31 | 7.31% / 0.36 |
+| 0.9 | 8.79% / 0.49 | 9.22% / 0.49 | 8.80% / 0.49 | 7.67% / 0.38 |
+| 0.95 | 9.99% / 0.66 | 8.53% / 0.48 | 9.94% / 0.64 | 9.28% / 0.56 |
+| 0.97 | 10.82% / 0.76 | 9.03% / 0.55 | 10.88% / 0.74 | 10.62% / 0.71 |
+| 0.99 | 9.32% / 0.63 | 12.52% / 0.90 | 11.59% / 0.84 | 11.63% / 0.85 |
 | 1 | 13.96% / 1.02 | 13.96% / 1.02 | 9.83% / 0.67 | 9.83% / 0.67 |
-| **Average** | 8.8% / 0.53 | 10.0% / 0.60 | 8.6% / 0.51 | 9.1% / 0.53 |
+| **Average** | 8.8% / 0.53 | 10.0% / 0.60 | 8.6% / 0.51 | 8.7% / 0.51 |
 
-- Statistical test, λ=0.9, tiny model against rebuilt benchmark: z = −0.21, p = 0.83.
+- Statistical test, λ=0.9, tiny model against rebuilt benchmark: z = −0.58, p = 0.56.
 - The exact minimum-variance K=7 portfolio returned 9.8% in 2025 against 14.0% for Solver's non-optimal one, so the existing headline result partly reflects where Solver stopped.
 
 ### 4.13 Why benchmark and prediction results match in that design
 
-- **Minimise risk:** the objective is variance, which depends only on the shared covariance matrix. Predictions enter only through the return floor (0.0237% a day), and the minimum-variance portfolios clear it comfortably under either set of expected returns (0.034–0.043% benchmark, 0.039–0.051% tiny model). A constraint that is not binding changes nothing, so the weights are identical for every K.
-- **Trade-off:** averaging 224 days of predictions recreates the historical average. The tiny model's average predicted return per stock has a correlation of 0.93 with the historical average, with the same top five stocks. The model's skill is in day-to-day changes, which cancel out in a yearly average.
+- **Minimise risk:** the objective is variance, which depends only on the shared covariance matrix. Predictions enter only through the return floor (0.0237% a day), and the minimum-variance portfolios clear it comfortably under either set of expected returns (0.034–0.043% benchmark, 0.046–0.053% tiny model). A constraint that is not binding changes nothing, so the weights are identical for every K.
+- **Trade-off:** averaging 224 days of predictions recreates the historical average. The tiny model's average predicted return per stock has a correlation of 0.96 with the historical average, with the same top five stocks. The model's skill is in day-to-day changes, which cancel out in a yearly average.
 
 The comparison cannot show a difference whichever model supplies the predictions. That is a property of the design, not evidence about prediction.
 
@@ -422,18 +430,18 @@ The cardinality loop uses the trade-off objective, not pure risk minimisation as
 
 | K | Daily tiny model | Static benchmark | Difference (points) | Daily Sharpe | Static Sharpe | Daily max drawdown | Static max drawdown | Daily turnover | z | p-value | Different at 5%? |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 4 | 39.3% | 11.8% | +27.5 | 2.04 | 0.72 | 13.3% | 12.5% | 62% | 2.86 | 0.004 | Yes |
-| 5 | 39.5% | 12.1% | +27.4 | 2.12 | 0.75 | 12.6% | 12.1% | 62% | 3.04 | 0.002 | Yes |
-| 6 | 36.2% | 12.9% | +23.4 | 1.99 | 0.83 | 12.6% | 11.7% | 61% | 2.65 | 0.008 | Yes |
-| 7 | 33.7% | 13.7% | +19.9 | 1.91 | 0.92 | 12.7% | 11.1% | 58% | 2.41 | 0.016 | Yes |
-| 8 | 31.1% | 13.9% | +17.2 | 1.82 | 0.95 | 12.5% | 10.6% | 54% | 2.18 | 0.029 | Yes |
-| 9 | 27.5% | 15.5% | +12.1 | 1.63 | 1.07 | 13.2% | 10.8% | 50% | 1.38 | 0.167 | No |
-| 10 | 26.8% | 15.8% | +11.0 | 1.62 | 1.11 | 13.0% | 10.4% | 45% | 1.17 | 0.242 | No |
-| 11 | 26.4% | 13.9% | +12.5 | 1.62 | 0.95 | 11.8% | 11.8% | 40% | 1.72 | 0.085 | No |
-| 12 | 23.6% | 14.4% | +9.2 | 1.48 | 0.99 | 12.3% | 12.1% | 32% | 1.49 | 0.136 | No |
+| 4 | 37.7% | 11.8% | +25.8 | 2.02 | 0.72 | 13.8% | 12.5% | 61% | 2.77 | 0.006 | Yes |
+| 5 | 40.9% | 12.1% | +28.8 | 2.24 | 0.75 | 13.2% | 12.1% | 60% | 3.20 | 0.001 | Yes |
+| 6 | 37.3% | 12.9% | +24.4 | 2.10 | 0.83 | 13.3% | 11.7% | 57% | 2.79 | 0.005 | Yes |
+| 7 | 35.9% | 13.7% | +22.2 | 2.04 | 0.92 | 13.6% | 11.1% | 54% | 2.52 | 0.012 | Yes |
+| 8 | 33.9% | 13.9% | +20.0 | 1.96 | 0.95 | 13.7% | 10.6% | 51% | 2.28 | 0.023 | Yes |
+| 9 | 34.0% | 15.5% | +18.5 | 1.99 | 1.07 | 13.4% | 10.8% | 48% | 2.08 | 0.038 | Yes |
+| 10 | 35.1% | 15.8% | +19.3 | 2.07 | 1.11 | 13.1% | 10.4% | 44% | 2.10 | 0.036 | Yes |
+| 11 | 34.1% | 13.9% | +20.3 | 2.04 | 0.95 | 12.7% | 11.8% | 39% | 2.66 | 0.008 | Yes |
+| 12 | 30.9% | 14.4% | +16.5 | 1.90 | 0.99 | 12.9% | 12.1% | 32% | 2.59 | 0.010 | Yes |
 
-- The daily portfolio beats the static benchmark at every K, and the gap narrows steadily as K grows: holding more stocks forces the portfolio to spread out, which leaves less room to act on the forecast.
-- The difference is statistically significant for K = 4 to 8 and not for K = 9 to 12.
+- The daily portfolio beats the static benchmark at every K. The gap is largest at K = 5 (29 points) and smallest at K = 12 (17 points).
+- The difference is statistically significant at every K from 4 to 12.
 - The best K for the daily strategy is 5 (highest return and Sharpe); for the static benchmark it is 10. K = 7, the existing workbook's choice, sits in the middle.
 - Choosing K by its 2025 result and then reporting that result would overstate it; the whole table is the fair picture.
 
@@ -441,14 +449,14 @@ The cardinality loop uses the trade-off objective, not pure risk minimisation as
 
 | λ | Daily tiny model | Static benchmark | Difference (points) | Daily Sharpe | Static Sharpe | Daily max drawdown | Static max drawdown | Daily turnover | z | p-value | Different at 5%? |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 0.1 | 38.9% | 14.0% | +25.0 | 1.92 | 0.83 | 16.0% | 13.2% | 57% | 2.15 | 0.031 | Yes |
-| 0.3 | 39.2% | 14.0% | +25.3 | 1.94 | 0.83 | 15.7% | 13.2% | 57% | 2.18 | 0.029 | Yes |
-| 0.5 | 40.4% | 14.0% | +26.4 | 2.01 | 0.83 | 14.9% | 13.2% | 57% | 2.36 | 0.018 | Yes |
-| 0.7 | 40.6% | 14.0% | +26.7 | 2.07 | 0.83 | 14.1% | 13.2% | 58% | 2.61 | 0.009 | Yes |
-| 0.9 | 33.7% | 13.7% | +19.9 | 1.91 | 0.92 | 12.7% | 11.1% | 58% | 2.41 | 0.016 | Yes |
-| 0.95 | 31.8% | 13.6% | +18.2 | 1.97 | 1.01 | 11.3% | 10.0% | 50% | 2.44 | 0.015 | Yes |
-| 0.97 | 29.3% | 13.9% | +15.4 | 1.99 | 1.07 | 10.4% | 9.8% | 40% | 2.52 | 0.012 | Yes |
-| 0.99 | 19.5% | 14.1% | +5.4 | 1.52 | 1.14 | 9.7% | 9.5% | 16% | 1.82 | 0.069 | No |
+| 0.1 | 34.9% | 14.0% | +21.0 | 1.84 | 0.83 | 15.0% | 13.2% | 56% | 2.04 | 0.041 | Yes |
+| 0.3 | 35.7% | 14.0% | +21.8 | 1.88 | 0.83 | 15.1% | 13.2% | 56% | 2.15 | 0.031 | Yes |
+| 0.5 | 35.5% | 14.0% | +21.5 | 1.88 | 0.83 | 15.7% | 13.2% | 57% | 2.18 | 0.030 | Yes |
+| 0.7 | 35.5% | 14.0% | +21.6 | 1.89 | 0.83 | 15.6% | 13.2% | 56% | 2.32 | 0.020 | Yes |
+| 0.9 | 35.9% | 13.7% | +22.2 | 2.04 | 0.92 | 13.6% | 11.1% | 54% | 2.52 | 0.012 | Yes |
+| 0.95 | 32.9% | 13.6% | +19.3 | 2.06 | 1.01 | 12.7% | 10.0% | 50% | 2.33 | 0.020 | Yes |
+| 0.97 | 28.5% | 13.9% | +14.6 | 2.01 | 1.07 | 11.2% | 9.8% | 37% | 2.34 | 0.019 | Yes |
+| 0.99 | 18.4% | 14.1% | +4.3 | 1.45 | 1.14 | 10.4% | 9.5% | 14% | 1.35 | 0.176 | No |
 | 1 | 12.3% | 12.3% | 0.0 | 0.96 | 0.96 | 10.6% | 10.6% | 0% | n/a | n/a | n/a |
 
 Returns are cumulative; Sharpe ratios are annualised. Equal weight returned 13.8% (Sharpe 0.94, max drawdown 13.1%) and the KLCI 7.2% (Sharpe 0.48, max drawdown 12.9%) over the same days. At λ = 1 the objective ignores expected returns, so the two portfolios are identical, which confirms that the forecast is the only difference elsewhere. The K = 7 row of stage A and the λ = 0.9 row of stage B are the same portfolio.
@@ -457,21 +465,21 @@ Returns are cumulative; Sharpe ratios are annualised. Equal weight returned 13.8
 
 Daily tiny model, cumulative return:
 
-| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1.0 |
+| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1 |
 |---|---|---|---|---|---|---|---|---|---|
-| 4 | 37.8% | 38.1% | 39.7% | 39.4% | 39.3% | 33.2% | 40.5% | 19.6% | 13.1% |
-| 5 | 36.6% | 37.2% | 38.0% | 37.8% | 39.5% | 35.4% | 35.2% | 21.7% | 14.0% |
-| 6 | 39.1% | 38.8% | 39.5% | 39.1% | 36.2% | 34.5% | 32.9% | 21.6% | 14.7% |
-| 7 | 38.9% | 39.2% | 40.4% | 40.6% | 33.7% | 31.8% | 29.3% | 19.5% | 12.3% |
-| 8 | 38.4% | 38.3% | 38.8% | 39.5% | 31.1% | 29.1% | 27.2% | 16.8% | 12.1% |
-| 9 | 39.1% | 38.9% | 38.7% | 38.9% | 27.5% | 27.4% | 25.6% | 14.3% | 11.7% |
-| 10 | 38.0% | 38.3% | 38.9% | 38.9% | 26.8% | 25.1% | 24.8% | 16.2% | 12.8% |
-| 11 | 33.3% | 33.1% | 33.1% | 34.1% | 26.4% | 23.8% | 25.5% | 16.7% | 12.6% |
-| 12 | 28.9% | 28.9% | 29.2% | 30.1% | 23.6% | 20.0% | 19.8% | 14.8% | 12.9% |
+| 4 | 40.1% | 40.1% | 40.8% | 39.9% | 37.7% | 35.2% | 32.2% | 20.1% | 13.1% |
+| 5 | 36.8% | 36.3% | 37.0% | 36.6% | 40.9% | 36.9% | 35.1% | 21.0% | 14.0% |
+| 6 | 36.5% | 36.5% | 36.2% | 36.5% | 37.3% | 33.4% | 30.0% | 19.3% | 14.7% |
+| 7 | 34.9% | 35.7% | 35.5% | 35.5% | 35.9% | 32.9% | 28.5% | 18.4% | 12.3% |
+| 8 | 35.4% | 36.4% | 36.5% | 36.1% | 33.9% | 28.5% | 26.9% | 18.2% | 12.1% |
+| 9 | 34.4% | 35.1% | 34.0% | 35.3% | 34.0% | 27.9% | 25.8% | 17.7% | 11.7% |
+| 10 | 32.8% | 33.7% | 33.7% | 34.7% | 35.1% | 28.5% | 23.9% | 17.0% | 12.8% |
+| 11 | 29.6% | 30.5% | 30.3% | 31.7% | 34.1% | 26.5% | 24.6% | 16.8% | 12.6% |
+| 12 | 26.5% | 27.8% | 27.3% | 28.8% | 30.9% | 24.7% | 21.1% | 15.4% | 12.9% |
 
 Static benchmark, cumulative return:
 
-| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1.0 |
+| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1 |
 |---|---|---|---|---|---|---|---|---|---|
 | 4 | 12.5% | 12.5% | 12.5% | 12.5% | 11.8% | 12.0% | 16.4% | 12.7% | 13.1% |
 | 5 | 13.5% | 13.5% | 13.5% | 13.5% | 12.1% | 13.5% | 13.6% | 13.8% | 14.0% |
@@ -485,21 +493,21 @@ Static benchmark, cumulative return:
 
 Daily tiny model, annual Sharpe ratio:
 
-| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1.0 |
+| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1 |
 |---|---|---|---|---|---|---|---|---|---|
-| 4 | 1.81 | 1.83 | 1.91 | 1.94 | 2.04 | 1.91 | 2.57 | 1.59 | 1.05 |
-| 5 | 1.76 | 1.80 | 1.85 | 1.88 | 2.12 | 2.09 | 2.32 | 1.73 | 1.16 |
-| 6 | 1.91 | 1.90 | 1.94 | 1.97 | 1.99 | 2.09 | 2.18 | 1.69 | 1.20 |
-| 7 | 1.92 | 1.93 | 2.01 | 2.07 | 1.91 | 1.97 | 1.99 | 1.52 | 0.96 |
-| 8 | 1.93 | 1.93 | 1.96 | 2.04 | 1.82 | 1.83 | 1.86 | 1.30 | 0.94 |
-| 9 | 1.99 | 1.98 | 1.98 | 2.04 | 1.63 | 1.74 | 1.76 | 1.08 | 0.88 |
-| 10 | 1.97 | 1.98 | 2.03 | 2.08 | 1.62 | 1.62 | 1.72 | 1.22 | 0.96 |
-| 11 | 1.80 | 1.79 | 1.80 | 1.88 | 1.62 | 1.56 | 1.80 | 1.26 | 0.95 |
-| 12 | 1.64 | 1.64 | 1.66 | 1.73 | 1.48 | 1.33 | 1.41 | 1.11 | 0.96 |
+| 4 | 1.98 | 1.99 | 2.04 | 2.01 | 2.02 | 2.11 | 2.17 | 1.62 | 1.05 |
+| 5 | 1.85 | 1.84 | 1.89 | 1.89 | 2.24 | 2.19 | 2.41 | 1.64 | 1.16 |
+| 6 | 1.88 | 1.89 | 1.89 | 1.92 | 2.10 | 2.06 | 2.08 | 1.55 | 1.20 |
+| 7 | 1.84 | 1.88 | 1.88 | 1.89 | 2.04 | 2.06 | 2.01 | 1.45 | 0.96 |
+| 8 | 1.89 | 1.95 | 1.96 | 1.95 | 1.96 | 1.81 | 1.90 | 1.43 | 0.94 |
+| 9 | 1.88 | 1.92 | 1.87 | 1.94 | 1.99 | 1.79 | 1.84 | 1.38 | 0.88 |
+| 10 | 1.82 | 1.87 | 1.87 | 1.93 | 2.07 | 1.84 | 1.70 | 1.29 | 0.96 |
+| 11 | 1.72 | 1.77 | 1.76 | 1.84 | 2.04 | 1.71 | 1.73 | 1.26 | 0.95 |
+| 12 | 1.60 | 1.67 | 1.65 | 1.74 | 1.90 | 1.63 | 1.51 | 1.16 | 0.96 |
 
 Static benchmark, annual Sharpe ratio:
 
-| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1.0 |
+| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1 |
 |---|---|---|---|---|---|---|---|---|---|
 | 4 | 0.69 | 0.69 | 0.69 | 0.69 | 0.72 | 0.83 | 1.27 | 1.02 | 1.05 |
 | 5 | 0.75 | 0.75 | 0.75 | 0.75 | 0.75 | 1.02 | 1.05 | 1.09 | 1.16 |
@@ -513,51 +521,90 @@ Static benchmark, annual Sharpe ratio:
 
 Jobson-Korkie-Memmel p-value, daily against static (bold = different at 5%):
 
-| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1.0 |
+| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1 |
 |---|---|---|---|---|---|---|---|---|---|
-| 4 | **0.035** | **0.031** | **0.019** | **0.013** | **0.004** | 0.055 | **0.017** | **0.006** | n/a |
-| 5 | **0.050** | **0.042** | **0.027** | **0.019** | **0.002** | **0.029** | **0.006** | **0.003** | n/a |
-| 6 | **0.028** | **0.028** | **0.019** | **0.015** | **0.008** | **0.005** | **0.011** | **0.016** | n/a |
-| 7 | **0.031** | **0.029** | **0.018** | **0.009** | **0.016** | **0.015** | **0.012** | 0.069 | n/a |
-| 8 | **0.046** | **0.047** | **0.040** | **0.020** | **0.029** | **0.032** | **0.015** | 0.086 | n/a |
-| 9 | 0.055 | 0.056 | 0.054 | **0.037** | 0.167 | 0.094 | **0.002** | 0.099 | n/a |
-| 10 | 0.110 | 0.105 | 0.088 | **0.042** | 0.242 | **0.038** | **0.005** | **0.039** | n/a |
-| 11 | 0.180 | 0.187 | 0.182 | 0.106 | 0.085 | 0.054 | **0.001** | **0.021** | n/a |
-| 12 | 0.108 | 0.107 | 0.097 | 0.059 | 0.136 | 0.183 | **0.047** | **0.021** | n/a |
+| 4 | **0.013** | **0.011** | **0.007** | **0.006** | **0.006** | **0.038** | 0.145 | **0.006** | n/a |
+| 5 | **0.027** | **0.027** | **0.017** | **0.012** | **0.001** | **0.033** | **0.004** | **0.007** | n/a |
+| 6 | **0.026** | **0.023** | **0.019** | **0.013** | **0.005** | **0.018** | **0.036** | 0.058 | n/a |
+| 7 | **0.041** | **0.031** | **0.030** | **0.020** | **0.012** | **0.020** | **0.019** | 0.176 | n/a |
+| 8 | **0.048** | **0.036** | **0.031** | **0.026** | **0.023** | 0.068 | **0.024** | **0.030** | n/a |
+| 9 | 0.072 | 0.061 | 0.069 | 0.051 | **0.038** | 0.115 | **0.005** | **0.002** | n/a |
+| 10 | 0.153 | 0.127 | 0.122 | 0.072 | **0.036** | **0.022** | **0.018** | **0.025** | n/a |
+| 11 | 0.205 | 0.168 | 0.169 | 0.104 | **0.008** | **0.031** | **0.011** | **0.015** | n/a |
+| 12 | 0.129 | 0.088 | 0.099 | 0.060 | **0.010** | **0.035** | **0.037** | **0.004** | n/a |
 
 Average daily turnover of the daily portfolio:
 
-| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1.0 |
+| K \ λ | 0.1 | 0.3 | 0.5 | 0.7 | 0.9 | 0.95 | 0.97 | 0.99 | 1 |
 |---|---|---|---|---|---|---|---|---|---|
-| 4 | 61% | 62% | 63% | 64% | 62% | 54% | 49% | 16% | 0% |
-| 5 | 61% | 61% | 62% | 63% | 62% | 54% | 46% | 16% | 0% |
-| 6 | 59% | 59% | 60% | 61% | 61% | 52% | 42% | 17% | 0% |
-| 7 | 57% | 57% | 57% | 58% | 58% | 50% | 40% | 16% | 0% |
-| 8 | 54% | 54% | 54% | 55% | 54% | 48% | 36% | 14% | 0% |
-| 9 | 50% | 49% | 50% | 51% | 50% | 44% | 33% | 10% | 0% |
-| 10 | 46% | 45% | 46% | 46% | 45% | 41% | 31% | 10% | 0% |
-| 11 | 39% | 39% | 39% | 40% | 40% | 37% | 28% | 10% | 0% |
-| 12 | 31% | 30% | 31% | 31% | 32% | 30% | 21% | 6% | 0% |
+| 4 | 61% | 61% | 61% | 61% | 61% | 58% | 51% | 14% | 0% |
+| 5 | 59% | 60% | 60% | 60% | 60% | 54% | 45% | 15% | 0% |
+| 6 | 57% | 58% | 58% | 58% | 57% | 53% | 40% | 13% | 0% |
+| 7 | 56% | 56% | 57% | 56% | 54% | 50% | 37% | 14% | 0% |
+| 8 | 53% | 53% | 53% | 53% | 51% | 47% | 36% | 13% | 0% |
+| 9 | 49% | 49% | 49% | 49% | 48% | 44% | 33% | 12% | 0% |
+| 10 | 45% | 45% | 45% | 45% | 44% | 41% | 31% | 11% | 0% |
+| 11 | 39% | 39% | 39% | 39% | 39% | 37% | 29% | 9% | 0% |
+| 12 | 31% | 32% | 32% | 32% | 32% | 31% | 23% | 6% | 0% |
 
-- **The daily portfolio is ahead in all 72 settings with λ below 1.** Its cumulative return ranges from 14.3% to 40.6%; the static benchmark's ranges from 11.4% to 17.7%. The gap ranges from 2.3 to 27.5 points.
-- **The difference is statistically significant in 47 of the 72 settings.** By K: 7, 8, 8, 7, 7 of 8 settings for K = 4 to 8, then 2, 4, 2, 2 of 8 for K = 9 to 12. So the stage A pattern (significant for small K, not for large K) holds across λ, not only at 0.9.
-- **λ = 0.97 is significant at every K**, the only such column. The static benchmark's Sharpe ratio is low there for large K while the daily portfolio's stays high.
+- **The daily portfolio is ahead in all 72 settings with λ below 1.** Its cumulative return ranges from 15.4% to 40.9%; the static benchmark's ranges from 11.4% to 17.7%. The gap ranges from 2.8 to 28.8 points.
+- **The difference is statistically significant in 51 of the 72 settings.** By K: 7, 8, 7, 7, 7 of 8 settings for K = 4 to 8, then 3, 4, 4, 4 of 8 for K = 9 to 12.
+- **λ = 0.9 is significant at every K**, the only such column. For K = 9 to 12 the difference is significant only at λ = 0.9 and above (with one exception), not at λ = 0.1 to 0.7.
 - **For λ from 0.1 to 0.7 the results barely change with λ.** The likely reason is that with so little weight on risk the optimiser mostly holds the stocks with the highest expected returns at the weight limits, whatever the exact λ.
-- **Highest values:** cumulative return 40.6% at K = 7, λ = 0.7; Sharpe ratio 2.57 at K = 4, λ = 0.97. These are the best of 72 tries on one year, so they overstate what to expect; the tables as a whole are the fair picture.
-- **Turnover falls as K rises and as λ approaches 1,** from about 62% a day (K = 4) to about 31% (K = 12) at low λ, and to 6–17% at λ = 0.99.
-- With 72 tests at the 5% level, about 4 would appear significant by chance alone; 47 is far more than that, but the tests are not independent (the settings hold overlapping portfolios on the same days).
+- **Highest values:** cumulative return 40.9% at K = 5, λ = 0.9; Sharpe ratio 2.41 at K = 5, λ = 0.97. These are the best of 72 tries on one year, so they overstate what to expect; the tables as a whole are the fair picture.
+- **Turnover falls as K rises and as λ approaches 1,** from about 61% a day (K = 4) to about 31% (K = 12) at low λ, and to 6–15% at λ = 0.99.
+- With 72 tests at the 5% level, about 4 would appear significant by chance alone; 51 is far more than that, but the tests are not independent (the settings hold overlapping portfolios on the same days).
 
-**Earlier version with trading costs (K = 7 only) (removed from the final workbook at the user's request):** at an assumed 0.15% per unit traded, results were:
+**With trading costs (K = 7 only; not in the workbook, which excludes costs at the user's request).** Deducting an assumed 0.15% per unit traded from the daily portfolio:
 
 | λ | Daily, before costs | Daily, after 0.15% costs | Static | Sharpe after costs | Static Sharpe | Break-even cost |
 |---|---|---|---|---|---|---|
-| 0.1 | 38.9% | 14.9% | 14.0% | 0.78 | 0.83 | 0.16% |
-| 0.5 | 40.4% | 15.8% | 14.0% | 0.84 | 0.83 | 0.17% |
-| 0.9 | 33.7% | 10.0% | 13.7% | 0.57 | 0.92 | 0.13% |
-| 0.97 | 29.3% | 13.2% | 13.9% | 0.89 | 1.07 | 0.15% |
-| 0.99 | 19.5% | 13.1% | 14.1% | 1.00 | 1.14 | 0.13% |
+| 0.1 | 34.9% | 11.9% | 14.0% | 0.65 | 0.83 | 0.14% |
+| 0.5 | 35.5% | 12.0% | 14.0% | 0.66 | 0.83 | 0.14% |
+| 0.9 | 35.9% | 13.2% | 13.7% | 0.77 | 0.92 | 0.15% |
+| 0.97 | 28.5% | 13.3% | 13.9% | 0.92 | 1.07 | 0.14% |
+| 0.99 | 18.4% | 13.1% | 14.1% | 1.01 | 1.14 | 0.12% |
 
-After costs no difference was statistically significant (p from 0.39 to 0.98). The 0.15% figure was an assumption, not a quoted fee.
+After costs the daily portfolio is slightly behind the static benchmark at every λ shown, and no difference is statistically significant (p from 0.59 to 0.73). The 0.15% figure is an assumption, not a quoted fee.
+
+### 4.15 Comparison with the original workbook
+
+Sheet `vs Original` of the daily workbook. The original workbook's own portfolios (the weights stored in `Copy ver MV model.xlsx`, found by Excel Solver, held fixed all year) are backtested over the same 224 days as the daily strategy, 3 Feb to 31 Dec 2025, with no trading costs. Because the period is shorter, the original figures here differ from the original workbook's own Summary, which covers all of 2025 (section 4.11). Returns are cumulative; Sharpe ratios are annualised. The test compares the daily tiny model with the original CNN-BiLSTM portfolio.
+
+**By number of stocks held.** Original: minimise-risk portfolios. Daily tiny model: trade-off at λ = 0.9.
+
+| K | Original benchmark | Original CNN-BiLSTM | Daily tiny model | Daily tiny minus original CNN-BiLSTM (points) | Original benchmark Sharpe | Original CNN-BiLSTM Sharpe | Daily tiny Sharpe | z | p-value | Different at 5%? |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 4 | 13.1% | 13.1% | 37.7% | +24.5 | 1.05 | 1.05 | 2.02 | 1.20 | 0.230 | No |
+| 5 | 14.0% | 13.9% | 40.9% | +27.0 | 1.16 | 1.11 | 2.24 | 1.52 | 0.128 | No |
+| 6 | 15.2% | 14.9% | 37.3% | +22.4 | 1.25 | 1.21 | 2.10 | 1.19 | 0.234 | No |
+| 7 | 15.9% | 15.9% | 35.9% | +20.0 | 1.28 | 1.28 | 2.04 | 1.07 | 0.284 | No |
+| 8 | 15.6% | 15.4% | 33.9% | +18.5 | 1.26 | 1.23 | 1.96 | 1.09 | 0.276 | No |
+| 9 | 13.3% | 15.0% | 34.0% | +19.1 | 1.03 | 1.17 | 1.99 | 1.35 | 0.177 | No |
+| 10 | 12.8% | 15.1% | 35.1% | +20.0 | 0.96 | 1.17 | 2.07 | 1.57 | 0.116 | No |
+| 11 | 12.9% | 15.1% | 34.1% | +19.1 | 0.96 | 1.16 | 2.04 | 1.58 | 0.115 | No |
+| 12 | 12.9% | 12.9% | 30.9% | +18.0 | 0.96 | 0.92 | 1.90 | 2.22 | 0.027 | Yes |
+
+**By λ, K = 7.** Original: trade-off portfolios.
+
+| λ | Original benchmark | Original CNN-BiLSTM | Daily tiny model | Daily tiny minus original CNN-BiLSTM (points) | Original benchmark Sharpe | Original CNN-BiLSTM Sharpe | Daily tiny Sharpe | z | p-value | Different at 5%? |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0.1 | 14.0% | 16.4% | 34.9% | +18.5 | 0.83 | 1.03 | 1.84 | 1.40 | 0.161 | No |
+| 0.3 | 14.0% | 16.4% | 35.7% | +19.3 | 0.83 | 1.03 | 1.88 | 1.49 | 0.137 | No |
+| 0.5 | 14.0% | 16.4% | 35.5% | +19.1 | 0.83 | 1.03 | 1.88 | 1.50 | 0.134 | No |
+| 0.7 | 14.0% | 16.4% | 35.5% | +19.1 | 0.83 | 1.03 | 1.89 | 1.58 | 0.114 | No |
+| 0.9 | 13.7% | 16.4% | 35.9% | +19.5 | 0.92 | 1.03 | 2.04 | 1.84 | 0.066 | No |
+| 0.95 | 13.9% | 14.3% | 32.9% | +18.7 | 1.07 | 0.97 | 2.06 | 1.99 | 0.047 | Yes |
+| 0.97 | 14.0% | 13.3% | 28.5% | +15.1 | 1.11 | 0.96 | 2.01 | 2.29 | 0.022 | Yes |
+| 0.99 | 12.0% | 15.0% | 18.4% | +3.4 | 0.93 | 1.19 | 1.45 | 1.01 | 0.312 | No |
+| 1 | 15.9% | 15.9% | 12.3% | −3.6 | 1.28 | 1.28 | 0.96 | −1.32 | 0.188 | No |
+
+- **Return:** the daily tiny model is ahead of both original portfolios in every row except λ = 1, by 18 to 27 points for K = 4 to 12 and by 15 to 20 points for λ up to 0.97.
+- **Sharpe ratio:** the daily tiny model's is about 1.8 to 2.2 against about 0.8 to 1.3 for the original portfolios (λ up to 0.97).
+- **Statistical test:** the Sharpe difference from the original CNN-BiLSTM portfolio is significant at 5% in 3 of the 18 comparisons (K = 12, λ = 0.95, λ = 0.97). The original portfolios did well over these 224 days, so the gap, although large, is not statistically reliable in most rows on one year of data.
+- **λ = 1:** the daily strategy ignores predictions there and holds the exact minimum-variance portfolio (12.3%), which did worse than the portfolio Excel Solver stopped at in the original workbook (15.9%).
+- **The original benchmark and original CNN-BiLSTM columns are close to each other** in most rows, for the reason given in section 4.13.
+- These results exclude trading costs. The daily portfolio trades about 55% of its value a day and the original portfolios do not trade, so at an assumed 0.15% cost the advantage would disappear, as in section 4.14.
 
 ---
 
@@ -608,6 +655,7 @@ Built from scratch. Blue cells are inputs or optimiser output; black cells are f
 | Sheet | Contents |
 |---|---|
 | **Summary** | Table A, cardinality loop: one row per K = 4 to 12 at λ = 0.9. Table B, λ loop: one row per λ at K = 7. Both tables show cumulative return of the daily and static portfolios, the difference, annual Sharpe ratios, max drawdowns, average daily turnover, daily Sharpe ratios, correlation, Jobson-Korkie-Memmel z and p-value, and whether they differ at 5%. Below: equal weight and KLCI over the same days, then notes on method and assumptions. |
+| **vs Original** | Comparison with the original workbook. Table A by K and table B by λ: cumulative return and Sharpe ratio of the original benchmark, the original CNN-BiLSTM and the daily tiny model over the same days, with the Jobson-Korkie-Memmel test of the daily tiny model against the original CNN-BiLSTM. Below: the 36 original weight sets, copied from `Copy ver MV model.xlsx`. |
 | **Grid summary** | The full grid. Seven tables with K = 4 to 12 down the side and λ = 0.1 to 1 across the top: daily cumulative return, static cumulative return, the difference, daily Sharpe, static Sharpe, p-value (yellow when below 0.05) and average daily turnover. Every cell links to the `Grid K` sheet for that K. |
 | **Chart** | Wealth from RM100,000 for λ = 0.9: daily tiny model, static benchmark, equal weight, KLCI, with a line chart. |
 | **Inputs** | Risk-free rate (ln(1.0288)/252), initial wealth (RM100,000), K = 7, weight limits 5% and 30%, colour key. |
@@ -618,6 +666,7 @@ Built from scratch. Blue cells are inputs or optimiser output; black cells are f
 | **Reference** | Equal-weight and KLCI daily returns, wealth, running peak and drawdown. |
 | **K=4 … K=12** (nine sheets) | The cardinality loop at λ = 0.9. Row 4: the static benchmark's weights for that K. Rows 6–229: one row per day with the 12 daily weights (optimiser output), then formulas for sum of weights, stocks held, turnover, daily portfolio return, static benchmark return, wealth of each, running peak and drawdown of each. |
 | **lam 0.1 … lam 1** (nine sheets) | The λ loop at K = 7, same layout. Sheet `lam 0.9` holds the same portfolio as sheet `K=7`. |
+| **Original returns** | Daily return of each of the 36 original-workbook portfolios (stored weights × actual returns), used by `vs Original`. |
 | **Grid K4 … Grid K12** (nine sheets) | The full grid, one sheet per K with nine λ blocks side by side (17 columns each). Rows 2–11: the block's statistics (cumulative returns, Sharpe ratios, turnover, correlation, z, p-value). Row 12: static benchmark weights. Rows 14–237: one row per day with the 12 daily weights (optimiser output), then formulas for turnover, daily return, static return and the wealth of each. |
 
 Turnover is the sum of absolute weight changes from the previous day and is shown for information only. No trading costs are deducted for either portfolio.
@@ -667,26 +716,26 @@ Yahoo Finance data can change slightly between downloads, and neural network tra
 
 ## 7. Limitations
 
+- **Shorter training history.** Starting in 2022 leaves three training years, and the first 60 trading days of 2022 are used only as look-back history. Alphas that need 200–250 days of history cannot be used without giving up most of the first training year.
 - **One test year.** Many model versions were compared on 2025; picking the best afterwards flatters the winner, so expect somewhat weaker results on a new year.
-- **A simpler model is better at forecasting.** The one-variable straight-line model beats the tiny CNN-BiLSTM (correlation 0.170 against 0.145).
+- **A simpler model is better at forecasting.** The one-variable straight-line model beats the tiny CNN-BiLSTM (correlation 0.170 against 0.137).
 - **The predictable effect may not be tradable.** The next-day reversal may partly be the gap between buying and selling prices. This was not tested.
 - **The grid results are 72 overlapping tests on one year.** They are not independent, and the best cell overstates what to expect. The `Grid K` sheets show returns, Sharpe ratios and turnover but not drawdowns; drawdowns are on the `K=` and `lam` sheets only.
-- **The daily backtest is an upper bound.** It assumes trading at the previous day's close, the same price the prediction is computed from, and deducts no costs. The daily portfolio trades about 57% of its value each day; at an assumed 0.15% per unit traded its advantage disappeared.
+- **The daily backtest is an upper bound.** It assumes trading at the previous day's close, the same price the prediction is computed from, and deducts no costs. The daily portfolio trades about 55% of its value each day at K = 7; at an assumed 0.15% per unit traded its advantage disappears.
 - **Selection of alphas used multiple comparisons.** 21 features were screened with a threshold of about two standard errors.
 - **The smaller-network result is not fully explained.** Which of size, pooling and dropout matters was not isolated.
 - **KLCI comparison is not like for like.** Stock returns include dividends; the index does not.
 - **Static rebuild keeps the existing design's look-ahead** (yearly average of predictions used from 2 January).
-- **Workbook verification.** Excel could not be automated on this machine (it stopped responding and may still be open on a dialog). The static rebuild's numbers were confirmed by recomputing the workbook's formulas in Python, which reproduces the existing workbook's Summary to rounding error. The daily workbook's formulas were evaluated with the Python `formulas` engine: about 454,000 cells, no errors, with the Summary and all 81 grid results matching an independent calculation to rounding. Both files are set to calculate when opened in Excel.
-- **The explainer report was not previewed** before publishing and shows single-run numbers.
+- **Workbook verification.** Excel could not be automated on this machine (it stopped responding and may still be open on a dialog). The static rebuild's numbers were confirmed by recomputing the workbook's formulas in Python, which reproduces the existing workbook's Summary to rounding error. The daily workbook's formulas were evaluated with the Python `formulas` engine: about 464,000 cells, no errors, with the Summary, all 81 grid results and the `vs Original` tables matching an independent calculation to rounding. Both files are set to calculate when opened in Excel.
+- **The explainer report is out of date.** Its figures do not match the current model, and it was not previewed before publishing.
 
 ---
 
 ## 8. State of the repository
 
-- **Branch:** `alpha101-momentum-reversal-features`, pushed to `origin` (`szeying26/fyp`). It is not merged into `main`. Pull request link: <https://github.com/szeying26/fyp/pull/new/alpha101-momentum-reversal-features>
-- **Committed and pushed (commit `7cfab2b`):** `alpha101.py`, `4b.alpha_features.py`, `7.pooled_cnn_bilstm_model.py`, `8.plot_pooled_results.py`, and the changes to `1.raw_data.py`, `5.feature_engineering.py`, `6.cnn_bilstm_model.py`.
-- **Committed and pushed afterwards:** this `README.md`, the `optimization/` folder and the two new workbooks.
-- **Also committed:** the generated files `DATASET/`, `OUTPUT/` and `malaysia_stocks.csv`, so results can be inspected without re-running the pipeline.
+- **Branch:** `alpha101-momentum-reversal-features`, pushed to `origin` (`szeying26/fyp`). It is not merged into `main`. 
+- **Pull request #1 (merged):** the model code. **Pull request #2:** the optimisation scripts, workbooks, this README and the generated data: <https://github.com/szeying26/fyp/pull/2>
+- **Generated files are in the repository** (`DATASET/`, `OUTPUT/`, `malaysia_stocks.csv`), so results can be inspected without re-running the pipeline.
 
 ---
 

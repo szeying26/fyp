@@ -226,6 +226,7 @@ notes = [
     "No look-ahead: each prediction uses prices only up to the previous trading day, and the covariance matrix uses 2022-2024 only.",
     "Static benchmark: the same optimisation with historical average returns, solved once and held all year. At lambda = 1 the objective ignores expected returns, so the daily and static portfolios are identical.",
     "Full grid: sheet 'Grid summary' shows every K from 4 to 12 combined with every lambda (81 settings); the daily weights behind it are on sheets 'Grid K4' to 'Grid K12'.",
+    "Comparison with the original workbook: sheet 'vs Original' backtests the original workbook's own portfolios over the same days and compares them with the daily tiny model.",
     "Two loops, as in the existing workbook: table A varies the number of stocks held (K = 4 to 12) at a fixed lambda; table B fixes K = 7 and varies lambda. Sheet 'K=7' and sheet 'lam 0.9' are the same portfolio.",
     "The cardinality loop uses the trade-off objective rather than pure risk minimisation, because when only risk is minimised the predictions do not enter and the daily and static portfolios are identical.",
     "Weights (blue cells on the 'K=' and 'lam' sheets) were found in Python by solving every K-stock combination each day and keeping the best. All other numbers are live formulas.",
@@ -319,6 +320,71 @@ if SOL_G:
     gs.column_dimensions["A"].width = 14
     for cc in range(2, 2 + len(GL)): gs.column_dimensions[L(cc)].width = 12
     gs.freeze_panes = "B4"
+
+# ---------------------------------------------------------------- comparison with the original workbook
+# The original workbook's own portfolios (its stored Solver weights), backtested over the same days as the daily strategy.
+OCOLS_K = {4: "AR", 5: "AN", 6: "AJ", 7: "AF", 8: "AB", 9: "X", 10: "T", 11: "P", 12: "L"}
+OCOLS_L = dict(zip(LAMS, ["H", "L", "P", "T", "X", "AB", "AF", "AJ", "AN"]))
+def orig_w(sheet, col, r0): return [float(old[sheet][f"{col}{r}"].value or 0) for r in range(r0, r0 + 12)]
+ORIG = []     # (set label, K or lambda, weights)
+for label, sheet in (("Original benchmark, minimise risk", "Benchmark_MV model"), ("Original CNN-BiLSTM, minimise risk", "Predicted_MV model")):
+    ORIG += [(label, K, orig_w(sheet, OCOLS_K[K], 18)) for K in KS]
+for label, sheet in (("Original benchmark, trade-off K = 7", "Benchmark_MV model"), ("Original CNN-BiLSTM, trade-off K = 7", "Predicted_MV model")):
+    ORIG += [(label, lam, orig_w(sheet, OCOLS_L[lam], 38)) for lam in LAMS]
+
+vo = wb.create_sheet("vs Original", 1)
+orr = wb.create_sheet("Original returns")
+put(vo, "A1", "Daily tiny CNN-BiLSTM strategy compared with the original workbook's portfolios", title)
+put(vo, "A2", f"The original portfolios use the weights stored in 'Copy ver MV model.xlsx' (found by Excel Solver) and are held fixed. All portfolios are measured over the same {N} days "
+              f"({pred['Date'].iloc[0][:10]} to {pred['Date'].iloc[-1][:10]}), so the original figures differ from that workbook's own Summary, which covers all of 2025. No trading costs.")
+WR0 = 30                                    # first row of the stored original weights
+put(vo, f"A{WR0 - 2}", "Original workbook weights (values copied from 'Copy ver MV model.xlsx', sheets 'Benchmark_MV model' and 'Predicted_MV model')", Font(name=F, size=12, bold=True))
+header(vo, WR0 - 1, ["Portfolio", "K or lambda"] + NAMES + ["Sum of weights"])
+header(orr, 1, ["Date"] + [f"{lab}, {v}" for lab, v, _ in ORIG])
+for k, (lab, v, w) in enumerate(ORIG):
+    r = WR0 + k
+    put(vo, f"A{r}", lab); put(vo, f"B{r}", v, blue, "0.00" if k >= 2 * len(KS) else "0")
+    for j in range(12): put(vo, f"{L(3 + j)}{r}", w[j], blue, "0.0%")
+    put(vo, f"O{r}", f"=SUM(C{r}:N{r})", base, "0.0%")
+for i in range(N):
+    a = AR0 + i
+    put(orr, f"A{a}", f"='Actual 2025'!A{a}", green)
+    for k in range(len(ORIG)):
+        put(orr, f"{L(2 + k)}{a}", f"=SUMPRODUCT('vs Original'!$C${WR0 + k}:$N${WR0 + k},'Actual 2025'!$B{a}:$M{a})", green, PCT4)
+orr.column_dimensions["A"].width = 26; orr.freeze_panes = "B2"
+for c in range(2, 2 + len(ORIG)): orr.column_dimensions[L(c)].width = 16
+put(orr, f"{L(3 + len(ORIG))}1", "Daily return of each original-workbook portfolio: stored weights x actual returns.")
+
+VH = ["Original benchmark: cumulative return", "Original CNN-BiLSTM: cumulative return", "Daily tiny model: cumulative return", "Daily tiny minus original CNN-BiLSTM",
+      "Original benchmark: Sharpe (annual)", "Original CNN-BiLSTM: Sharpe (annual)", "Daily tiny: Sharpe (annual)",
+      "Daily tiny Sharpe (daily)", "Original CNN-BiLSTM Sharpe (daily)", "Correlation of the two series", "JK-Memmel z statistic", "p-value", "Different at 5%?"]
+def vs_row(r, label, fmt, k_bench, k_pred, sheet):
+    ob, op = (f"'Original returns'!{L(2 + k)}{AR0}:{L(2 + k)}{AR1}" for k in (k_bench, k_pred))
+    q = f"'{sheet}'!Q{FIRST}:Q{LAST}"
+    put(vo, f"A{r}", label, bold, fmt)
+    put(vo, f"B{r}", f"=EXP(SUMPRODUCT(LN(1+{ob})))-1", green, PCT)
+    put(vo, f"C{r}", f"=EXP(SUMPRODUCT(LN(1+{op})))-1", green, PCT)
+    put(vo, f"D{r}", f"='{sheet}'!S{LAST}/{W0}-1", green, PCT)
+    put(vo, f"E{r}", f"=D{r}-C{r}", base, PCT)
+    put(vo, f"F{r}", f"=(AVERAGE({ob})-{RF})/STDEV({ob})*SQRT(252)", green, NUM)
+    put(vo, f"G{r}", f"=J{r}*SQRT(252)", base, NUM)
+    put(vo, f"H{r}", f"=I{r}*SQRT(252)", base, NUM)
+    put(vo, f"I{r}", f"=(AVERAGE({q})-{RF})/STDEV({q})", green, "0.0000")
+    put(vo, f"J{r}", f"=(AVERAGE({op})-{RF})/STDEV({op})", green, "0.0000")
+    put(vo, f"K{r}", f"=CORREL({q},{op})", green, NUM)
+    put(vo, f"L{r}", f"=(I{r}-J{r})/SQRT((1/{N})*(2-2*K{r}+0.5*(I{r}^2+J{r}^2-2*I{r}*J{r}*K{r}^2)))", base, NUM)
+    put(vo, f"M{r}", f"=2*(1-NORMSDIST(ABS(L{r})))", base, NUM)
+    put(vo, f"N{r}", f'=IF(M{r}<0.05,"Yes","No")')
+nK = len(KS)
+put(vo, "A4", f"A. By number of stocks held. Original: minimise risk. Daily tiny model: trade-off at lambda = {LAM_K} (sheets 'K=')", Font(name=F, size=12, bold=True))
+header(vo, 5, ["K (stocks held)"] + VH)
+for i, K in enumerate(KS): vs_row(6 + i, K, "0", i, nK + i, k_sheet_name(K))
+put(vo, "A16", "B. By lambda, K = 7. Original: trade-off portfolios. Daily tiny model: sheets 'lam'", Font(name=F, size=12, bold=True))
+header(vo, 17, ["lambda"] + VH)
+for i, lam in enumerate(LAMS): vs_row(18 + i, lam, "0.00", 2 * nK + i, 2 * nK + len(LAMS) + i, sheet_name(lam))
+put(vo, "A27", "The statistical test compares the daily tiny model with the original CNN-BiLSTM portfolio (Jobson-Korkie with Memmel correction).")
+vo.column_dimensions["A"].width = 36; vo.freeze_panes = "B4"
+for c in range(2, 16): vo.column_dimensions[L(c)].width = 15
 
 # ---------------------------------------------------------------- chart
 ch = wb.create_sheet("Chart", 1)

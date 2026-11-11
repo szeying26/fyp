@@ -56,9 +56,9 @@ def load_rolling_zscore_returns(stock_columns, window=ZSCORE_WINDOW):
         z_t = (r_t - mean(r_{t-window} .. r_{t-1})) / std(r_{t-window} .. r_{t-1})
 
     The mean and std come from the PREVIOUS `window` days only, so z_t never
-    uses information from day t+1 onwards. Returns are rebuilt from the OHLCV
-    file because it starts before 2022, which gives the first training days
-    a full window of history.
+    uses information from day t+1 onwards. The data starts in 2022, so the
+    first `window` + 1 trading days have no z-score; they serve as look-back
+    history only and are left out of the training sample.
 
     Returns:
         DataFrame with a Date column and one z-score column per stock.
@@ -75,6 +75,19 @@ def load_rolling_zscore_returns(stock_columns, window=ZSCORE_WINDOW):
     return zscores.dropna().reset_index()
 
 
+def check_missing_only_at_start(values, label):
+    """
+    Inputs may be missing only during the look-back period at the very start
+    of the data (those rows are dropped when the windows are built). A gap
+    anywhere later would silently break the windows, so it is an error.
+    """
+    missing = values.isna().any(axis=1).to_numpy()
+    n_start = int(np.argmin(missing)) if not missing.all() else len(missing)
+    if missing[n_start:].any():
+        raise ValueError(f"{label} are missing for dates after the look-back period. Re-run the earlier steps.")
+    return n_start
+
+
 def replace_with_zscores(df, zscore_df):
     """
     Split one dataset into model inputs (z-scored returns) and targets (the
@@ -83,11 +96,7 @@ def replace_with_zscores(df, zscore_df):
     stock_columns = [col for col in df.columns if col != "Date"]
     input_df = df[["Date"]].merge(zscore_df, on="Date", how="left", validate="one_to_one")
 
-    if input_df[stock_columns].isna().any().any():
-        raise ValueError(
-            "Rolling z-scores are missing for some dates. Re-run 1.raw_data.py "
-            "so the OHLCV file covers the warm-up period."
-        )
+    check_missing_only_at_start(input_df[stock_columns], "Rolling z-scores")
 
     return input_df, df
 
@@ -124,11 +133,7 @@ def add_alpha_features(df, alpha_df, target_column):
     merged = df.merge(stock_alphas, on="Date", how="left", validate="one_to_one")
 
     alpha_columns = [col for col in stock_alphas.columns if col != "Date"]
-    if merged[alpha_columns].isna().any().any():
-        raise ValueError(
-            f"Alpha features are missing for some dates of {target_column}. "
-            f"Re-run 4b.alpha_features.py."
-        )
+    check_missing_only_at_start(merged[alpha_columns], f"Alpha features of {target_column}")
 
     return merged
 

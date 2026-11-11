@@ -46,7 +46,9 @@ SELECTED_FILEPATH = os.path.join(OUTPUT_FOLDER, "selected_alpha_features.json")
 # =========================
 # Selection thresholds
 # =========================
-MIN_COVERAGE = 0.95      # share of non-missing train rows required
+MIN_COVERAGE = 0.95      # share of non-missing train rows required. With data from 2022 only, this
+                         # drops alphas whose look-back is longer than ~36 trading days of history
+                         # (e.g. sum(returns, 250)): they would cost most of the first training year.
 MIN_ABS_IC = 0.02        # on the partial IC; ~2 standard errors for ~8,800 pooled train rows
 MAX_FEATURE_CORR = 0.70  # two features above this are treated as duplicates
 WINSOR_QUANTILES = (0.01, 0.99)
@@ -96,12 +98,17 @@ def clean_feature(frame, train_dates):
     Winsorize each stock's series at its train 1%/99% quantiles and fill the
     few remaining gaps (forward fill, then the train median). Only train-period
     statistics are used, so nothing leaks from the test year.
+
+    The data starts in 2022, so every alpha is missing for its first look-back
+    days. Those leading rows are left missing (not filled with a made-up
+    value); 5.feature_engineering.py leaves them out of the training sample.
     """
     train = frame.loc[frame.index.isin(train_dates)]
     lower = train.quantile(WINSOR_QUANTILES[0])
     upper = train.quantile(WINSOR_QUANTILES[1])
     cleaned = frame.clip(lower=lower, upper=upper, axis=1)
-    return cleaned.ffill().fillna(train.median())
+    has_started = frame.notna().cummax()
+    return cleaned.ffill().fillna(train.median()).where(has_started)
 
 
 # =========================
@@ -256,7 +263,7 @@ def main():
     open_, high, low, close, volume = load_price_panels()
     raw_alphas = compute_momentum_reversal_alphas(open_, high, low, close, volume)
 
-    # Keep the modelling sample only (the warm-up history has done its job).
+    # Keep the modelling sample only.
     sample_dates = log_returns.index
     missing = sample_dates.difference(close.index)
     if len(missing):
