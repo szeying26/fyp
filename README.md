@@ -733,8 +733,10 @@ Yahoo Finance data can change slightly between downloads, and neural network tra
 
 ## 8. State of the repository
 
-- **Branch:** `alpha101-momentum-reversal-features`, pushed to `origin` (`szeying26/fyp`). It is not merged into `main`. 
-- **Pull request #1 (merged):** the model code. **Pull request #2:** the optimisation scripts, workbooks, this README and the generated data: <https://github.com/szeying26/fyp/pull/2>
+- **Branch:** `alpha101-momentum-reversal-features`, pushed to `origin` (`szeying26/fyp`).
+- **Pull request #1 (merged into `main`):** the model code.
+- **Pull request #2 (merged into `main`):** the optimisation scripts, workbooks, this README and the generated data.
+- **Pull request #3:** all data starting in 2022, everything re-run, and the comparison with the original workbook: <https://github.com/szeying26/fyp/pull/3>
 - **Generated files are in the repository** (`DATASET/`, `OUTPUT/`, `malaysia_stocks.csv`), so results can be inspected without re-running the pipeline.
 
 ---
