@@ -25,7 +25,17 @@ USE_ROLLING_ZSCORE = True
 ZSCORE_WINDOW = 60
 OHLCV_FILEPATH = "DATASET/ohlcv_malaysia_stocks.csv"
 
-WINDOW_SIZE = 20
+# Each sample is the previous WINDOW_SIZE days of inputs. The pooled model in
+# 7.pooled_cnn_bilstm_model.py uses these windows as they are.
+WINDOW_SIZE = 5
+
+# Test windows take their look-back days from the end of the training period,
+# so the first test day (the first trading day of the test year) already has a
+# full window and gets a prediction. Those look-back days are in the past on
+# that day, so nothing from the future is used. Set to False to build the test
+# windows from test data only (the first WINDOW_SIZE test days then get no
+# prediction).
+TEST_LOOKBACK_FROM_TRAIN = True
 
 
 # =========================
@@ -141,7 +151,7 @@ def add_alpha_features(df, alpha_df, target_column):
 # =========================
 # 2. Create sliding windows for one target stock
 # =========================
-def create_sliding_windows(df, target_column, window_size=20, target_df=None):
+def create_sliding_windows(df, target_column, window_size=WINDOW_SIZE, target_df=None):
     """
     Create sliding windows for one target stock.
 
@@ -258,12 +268,20 @@ def main():
             target_df=train_target_df
         )
 
-        # Create test windows
+        # Create test windows (look-back days come from the end of training)
+        test_input_df, test_window_target_df = stock_test_df, test_target_df
+        if TEST_LOOKBACK_FROM_TRAIN:
+            test_input_df = pd.concat(
+                [stock_train_df.tail(WINDOW_SIZE), stock_test_df], ignore_index=True
+            )
+            test_window_target_df = pd.concat(
+                [train_target_df.tail(WINDOW_SIZE), test_target_df], ignore_index=True
+            )
         X_test, y_test, test_dates, _ = create_sliding_windows(
-            stock_test_df,
+            test_input_df,
             target_column=stock,
             window_size=WINDOW_SIZE,
-            target_df=test_target_df
+            target_df=test_window_target_df
         )
 
         # Save outputs

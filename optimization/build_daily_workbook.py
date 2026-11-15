@@ -15,7 +15,7 @@ pred = pd.read_csv(PRED_CSV)
 LAMS = [0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 0.97, 0.99, 1]
 NAMES = ["CIMB", "MAYBANK", "PUBLIC BANK", "TELEKOM", "PETRONAS", "SUNWAY", "IHH HEALTHCARE", "TNB",
          "HONG LEONG BANK", "MAXIS", "AXIATA", "PRESS METAL"]
-N = len(pred)                    # 224 trading days
+N = len(pred)                    # every trading day of 2025 (244)
 FIRST, LAST = 6, 6 + N - 1       # data rows on the lambda sheets
 AR0, AR1 = 2, 2 + N - 1          # data rows on the data sheets
 
@@ -77,7 +77,7 @@ for i, date in enumerate(pred["Date"]):
         put(act, f"{L(2 + j)}{r}", float(actual_by_date[date][j]), blue, "0.0000%")
         put(prd, f"{L(2 + j)}{r}", float(pred.iloc[i, 1 + j]), blue, "0.0000%")
     put(act, f"N{r}", float(klci_by_date.get(date, 0)), blue, "0.0000%")
-put(act, "P1", "Actual daily log returns. Source: 'Copy ver MV model.xlsx', sheets 'Actual 2025' and 'KLSE_data', restricted to the days that have a prediction.")
+put(act, "P1", "Actual daily log returns. Source: 'Copy ver MV model.xlsx', sheets 'Actual 2025' and 'KLSE_data', for the days that have a prediction (every trading day of 2025).")
 put(prd, "O1", "Tiny CNN-BiLSTM predicted next-day log return. Each row was produced from data up to the previous trading day. Source: DATASET/model_output_pooled/predicted_returns_all_stocks.csv (7.pooled_cnn_bilstm_model.py).")
 for ws in (act, prd):
     ws.column_dimensions["A"].width = 26; ws.freeze_panes = "B2"
@@ -336,7 +336,7 @@ vo = wb.create_sheet("vs Original", 1)
 orr = wb.create_sheet("Original returns")
 put(vo, "A1", "Daily tiny CNN-BiLSTM strategy compared with the original workbook's portfolios", title)
 put(vo, "A2", f"The original portfolios use the weights stored in 'Copy ver MV model.xlsx' (found by Excel Solver) and are held fixed. All portfolios are measured over the same {N} days "
-              f"({pred['Date'].iloc[0][:10]} to {pred['Date'].iloc[-1][:10]}), so the original figures differ from that workbook's own Summary, which covers all of 2025. No trading costs.")
+              f"({pred['Date'].iloc[0][:10]} to {pred['Date'].iloc[-1][:10]}), the whole of 2025, which is also the period of that workbook's own Summary. No trading costs.")
 WR0 = 30                                    # first row of the stored original weights
 put(vo, f"A{WR0 - 2}", "Original workbook weights (values copied from 'Copy ver MV model.xlsx', sheets 'Benchmark_MV model' and 'Predicted_MV model')", Font(name=F, size=12, bold=True))
 header(vo, WR0 - 1, ["Portfolio", "K or lambda"] + NAMES + ["Sum of weights"])
