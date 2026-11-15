@@ -20,9 +20,17 @@ def put(ws, col, r0, w):
 
 # 1. tiny-model predictions
 pred = pd.read_csv(PRED_CSV); ws = wb["Predicted data"]
-assert [ws.cell(r, 1).value for r in range(2, 226)] == pred["Date"].tolist(), "dates differ"
-for i, row in enumerate(pred.iloc[:, 1:].to_numpy()):
-    for j, v in enumerate(row): ws.cell(2 + i, 2 + j).value = float(v)
+# The original sheet holds 224 days (3 Feb - 31 Dec 2025). The tiny-model predictions cover every trading day of 2025,
+# so the sheet is rewritten from row 2 and the yearly averages on 'Predicted_MV model' are pointed at all rows.
+N = len(pred)
+assert [ws.cell(r, 1).value for r in range(2, 226)] == pred["Date"].tolist()[-224:], "dates differ"
+for i, (d, row) in enumerate(zip(pred["Date"], pred.iloc[:, 1:].to_numpy())):
+    ws.cell(2 + i, 1).value = d
+    for j, v in enumerate(row):
+        c = ws.cell(2 + i, 2 + j); c.value = float(v); c.number_format = ws.cell(2, 2 + j).number_format
+for j in range(12):
+    assert wb["Predicted_MV model"].cell(3 + j, 2).value == f"=AVERAGE('Predicted data'!{L(2 + j)}2:{L(2 + j)}225)"
+    wb["Predicted_MV model"].cell(3 + j, 2).value = f"=AVERAGE('Predicted data'!{L(2 + j)}2:{L(2 + j)}{N + 1})"
 
 # 2. optimal weights (exact search) for both models
 for sheet, tag in (("Benchmark_MV model", "hist"), ("Predicted_MV model", "tiny")):
@@ -96,7 +104,7 @@ for i, (name, ref, fmt) in enumerate([("Sharpe ratio, predicted portfolio (daily
 r += 9
 cell(f"A{r}", "Notes", Font(name=F, bold=True, size=12))
 notes = [
-    "Predicted data: replaced with the pooled tiny CNN-BiLSTM predictions (509 weights, 5-day window, average of 5 runs), 3 Feb - 31 Dec 2025. Source: DATASET/model_output_pooled/predicted_returns_all_stocks.csv from 7.pooled_cnn_bilstm_model.py.",
+    "Predicted data: replaced with the pooled tiny CNN-BiLSTM predictions (477 weights, 5-day window, average of 5 runs), every trading day of 2025 (2 Jan - 31 Dec). Source: DATASET/model_output_pooled/predicted_returns_all_stocks.csv from 7.pooled_cnn_bilstm_model.py.",
     "Method is unchanged from the existing workbook: same covariance matrix (2022-2024), same constraints (5%-30% per held stock, exactly K stocks, minimum return ln(1.0615)/252 per day), same backtest and test formulas.",
     "Weights: the existing workbook's weights came from Excel Solver. Here every K-stock subset was solved in Python (scipy SLSQP) and the best kept, so the weights are the true optimum. This was done for BOTH the benchmark and the tiny-model sheets so they are compared on equal terms.",
     "Because of that, 'Rebuild: Benchmark' differs from 'Existing: Benchmark' wherever Solver had stopped at a non-optimal portfolio (K=6,7,8,9,11 and lambda >= 0.95).",

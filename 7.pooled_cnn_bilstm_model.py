@@ -4,9 +4,10 @@ Step 7 - Pooled tiny CNN-BiLSTM: one small model trained on all stocks together.
 6.cnn_bilstm_model.py trains a separate 54,321-weight network per stock on
 ~700 samples each. Here the samples of every stock are stacked, so a single
 network learns from ~8,500 samples and the patterns it finds have to hold
-across stocks. The network is also much smaller (509 weights) and only looks
-at the last INPUT_WINDOW days: in testing, almost all of the predictable
-signal sat in the most recent days, and the large network mostly fitted noise.
+across stocks. The network is also much smaller (477 weights) and looks at
+5-day windows (WINDOW_SIZE in 5.feature_engineering.py): in testing, almost
+all of the predictable signal sat in the most recent days, and the large
+network mostly fitted noise.
 
 Neural networks start from random weights, so single runs differ. The model
 is trained N_RUNS times with different seeds and the predictions are averaged.
@@ -48,7 +49,11 @@ BATCH_SIZE = 64
 VALIDATION_FRACTION = 0.1   # most recent share of each stock's train windows
 RANDOM_SEED = 42
 N_RUNS = 5                  # seeds RANDOM_SEED, RANDOM_SEED + 1, ... are averaged
-INPUT_WINDOW = 5            # use only the last 5 days of each 20-day window
+
+# Run with the environment variable REUSE_SAVED_MODELS=1 to load the saved
+# models from OUTPUT_FOLDER and only predict (no training). Used when the test
+# windows change but the model must stay exactly the same.
+REUSE_SAVED_MODELS = os.environ.get("REUSE_SAVED_MODELS") == "1"
 
 
 def set_seed(seed=RANDOM_SEED):
@@ -99,10 +104,6 @@ def prepare_stock(stock_name, own_return_idx):
     x_scaler = StandardScaler().fit(X_train.reshape(-1, n_features))
     X_train = x_scaler.transform(X_train.reshape(-1, n_features)).reshape(X_train.shape)
     X_test = x_scaler.transform(X_test.reshape(-1, n_features)).reshape(X_test.shape)
-
-    # Keep only the most recent days of each window.
-    X_train = X_train[:, -INPUT_WINDOW:, :]
-    X_test = X_test[:, -INPUT_WINDOW:, :]
 
     # Put the target stock's own return in channel 0.
     X_train = np.concatenate([X_train[:, :, [own_return_idx]], X_train], axis=2)
@@ -164,22 +165,27 @@ def main():
         seed = RANDOM_SEED + run
         set_seed(seed)
 
-        model = build_cnn_bilstm_model(input_shape=X_fit.shape[1:])
-        if run == 0:
-            print(f"Model weights: {model.count_params():,}")
-        early_stop = EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
+        model_path = os.path.join(OUTPUT_FOLDER, f"cnn_bilstm_pooled_seed{seed}.keras")
+        if REUSE_SAVED_MODELS:
+            model = tf.keras.models.load_model(model_path)
+            print(f"Run {run + 1}/{N_RUNS} (seed {seed}): loaded {model_path}")
+        else:
+            model = build_cnn_bilstm_model(input_shape=X_fit.shape[1:])
+            if run == 0:
+                print(f"Model weights: {model.count_params():,}")
+            early_stop = EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
 
-        history = model.fit(
-            X_fit, y_fit,
-            validation_data=(X_val, y_val),
-            epochs=EPOCHS,
-            batch_size=BATCH_SIZE,
-            shuffle=True,
-            verbose=0,
-            callbacks=[early_stop],
-        )
-        print(f"Run {run + 1}/{N_RUNS} (seed {seed}): best val_loss {min(history.history['val_loss']):.4f}")
-        model.save(os.path.join(OUTPUT_FOLDER, f"cnn_bilstm_pooled_seed{seed}.keras"))
+            history = model.fit(
+                X_fit, y_fit,
+                validation_data=(X_val, y_val),
+                epochs=EPOCHS,
+                batch_size=BATCH_SIZE,
+                shuffle=True,
+                verbose=0,
+                callbacks=[early_stop],
+            )
+            print(f"Run {run + 1}/{N_RUNS} (seed {seed}): best val_loss {min(history.history['val_loss']):.4f}")
+            model.save(model_path)
 
         for stock, data in stock_data.items():
             scaled_predictions[stock].append(model.predict(data["X_test"], verbose=0))
